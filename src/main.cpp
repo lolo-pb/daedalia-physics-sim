@@ -30,9 +30,9 @@
 #include <Jolt/Physics/PhysicsSystem.h>
 #include <Jolt/RegisterTypes.h>
 
-#include "controller.hpp"
+#include "controllers/demo_controller.hpp"
 #include "drone.hpp"
-#include "ideal_imu.hpp"
+#include "sensors/ideal_imu.hpp"
 
 namespace {
 

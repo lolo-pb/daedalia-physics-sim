@@ -1,9 +1,9 @@
 #include <cmath>
 #include <cstdio>
 
-#include "controller.hpp"
-#include "controller_io.hpp"
-#include "ideal_imu.hpp"
+#include "controllers/controller_io.hpp"
+#include "controllers/demo_controller.hpp"
+#include "sensors/ideal_imu.hpp"
 
 namespace {
 

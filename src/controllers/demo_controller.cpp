@@ -1,4 +1,4 @@
-#include "controller.hpp"
+#include "controllers/demo_controller.hpp"
 
 void UpdateDemoController(const ControllerInput &input, TargetDrone &drone) {
   static_cast<void>(input);

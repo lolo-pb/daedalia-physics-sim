@@ -6,7 +6,7 @@
 #include <Jolt/Jolt.h>
 #include <Jolt/Physics/Body/BodyID.h>
 
-#include "controller_io.hpp"
+#include "controllers/controller_io.hpp"
 
 namespace JPH {
 class BodyInterface;

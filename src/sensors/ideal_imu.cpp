@@ -1,4 +1,4 @@
-#include "ideal_imu.hpp"
+#include "sensors/ideal_imu.hpp"
 
 namespace {
 

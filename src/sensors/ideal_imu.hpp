@@ -2,7 +2,7 @@
 
 #include <Jolt/Jolt.h>
 
-#include "controller_io.hpp"
+#include "controllers/controller_io.hpp"
 
 class IdealImuModel {
 public:
