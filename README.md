@@ -11,3 +11,9 @@ cmake --build build
 ```
 
 CMake downloads the project dependencies on first configuration.
+
+## Camera controls
+
+- Hold right mouse button to look around.
+- `W` `A` `S` `D` move.
+- `Space` rises; `Ctrl` descends; `Shift` boosts movement speed.

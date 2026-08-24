@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
@@ -137,6 +138,21 @@ struct Mesh {
     GLuint vertex_count = 0;
 };
 
+struct Camera {
+    glm::vec3 position{7.0f, 5.0f, 7.0f};
+    float yaw = -135.0f;
+    float pitch = -20.0f;
+
+    glm::vec3 Forward() const {
+        const float yaw_radians = glm::radians(yaw);
+        const float pitch_radians = glm::radians(pitch);
+        return glm::normalize(glm::vec3(
+            std::cos(yaw_radians) * std::cos(pitch_radians),
+            std::sin(pitch_radians),
+            std::sin(yaw_radians) * std::cos(pitch_radians)));
+    }
+};
+
 Mesh CreateMesh(const float *vertices, GLuint vertex_count) {
     Mesh mesh{.vertex_count = vertex_count};
     GLuint vertex_buffer = 0;
@@ -244,6 +260,8 @@ int main() {
     glEnable(GL_DEPTH_TEST);
 
     bool running = true;
+    bool looking = false;
+    Camera camera;
     auto previous_time = std::chrono::steady_clock::now();
     double accumulator = 0.0;
     constexpr double physics_step = 1.0 / 120.0;
@@ -253,11 +271,36 @@ int main() {
             if (event.type == SDL_EVENT_QUIT) {
                 running = false;
             }
+            if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN && event.button.button == SDL_BUTTON_RIGHT) {
+                looking = true;
+                SDL_SetWindowRelativeMouseMode(window, true);
+            }
+            if (event.type == SDL_EVENT_MOUSE_BUTTON_UP && event.button.button == SDL_BUTTON_RIGHT) {
+                looking = false;
+                SDL_SetWindowRelativeMouseMode(window, false);
+            }
+            if (looking && event.type == SDL_EVENT_MOUSE_MOTION) {
+                camera.yaw += event.motion.xrel * 0.1f;
+                camera.pitch = std::clamp(camera.pitch - event.motion.yrel * 0.1f, -89.0f, 89.0f);
+            }
         }
 
         const auto now = std::chrono::steady_clock::now();
-        accumulator += std::min(0.25, std::chrono::duration<double>(now - previous_time).count());
+        const float frame_seconds = static_cast<float>(std::min(0.25, std::chrono::duration<double>(now - previous_time).count()));
         previous_time = now;
+        const bool *keys = SDL_GetKeyboardState(nullptr);
+        const float movement_speed = (keys[SDL_SCANCODE_LSHIFT] || keys[SDL_SCANCODE_RSHIFT] ? 15.0f : 5.0f) * frame_seconds;
+        const glm::vec3 forward = camera.Forward();
+        const glm::vec3 horizontal_forward = glm::normalize(glm::vec3(forward.x, 0.0f, forward.z));
+        const glm::vec3 right = glm::normalize(glm::cross(horizontal_forward, glm::vec3(0.0f, 1.0f, 0.0f)));
+        if (keys[SDL_SCANCODE_W]) camera.position += horizontal_forward * movement_speed;
+        if (keys[SDL_SCANCODE_S]) camera.position -= horizontal_forward * movement_speed;
+        if (keys[SDL_SCANCODE_D]) camera.position += right * movement_speed;
+        if (keys[SDL_SCANCODE_A]) camera.position -= right * movement_speed;
+        if (keys[SDL_SCANCODE_SPACE]) camera.position.y += movement_speed;
+        if (keys[SDL_SCANCODE_LCTRL] || keys[SDL_SCANCODE_RCTRL]) camera.position.y -= movement_speed;
+
+        accumulator += frame_seconds;
         while (accumulator >= physics_step) {
             physics.Update(static_cast<float>(physics_step), 1, &temp_allocator, &job_system);
             accumulator -= physics_step;
@@ -272,7 +315,7 @@ int main() {
         glUseProgram(program);
 
         const glm::mat4 projection = glm::perspective(glm::radians(50.0f), static_cast<float>(width) / static_cast<float>(height), 0.1f, 100.0f);
-        const glm::mat4 view = glm::lookAt(glm::vec3(7.0f, 5.0f, 7.0f), glm::vec3(0.0f, 1.5f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+        const glm::mat4 view = glm::lookAt(camera.position, camera.position + camera.Forward(), glm::vec3(0.0f, 1.0f, 0.0f));
         glUniformMatrix4fv(glGetUniformLocation(program, "view_projection"), 1, GL_FALSE, glm::value_ptr(projection * view));
         DrawMesh(plane, program, glm::mat4(1.0f), glm::vec3(0.28f, 0.33f, 0.28f));
 
@@ -284,6 +327,7 @@ int main() {
         SDL_GL_SwapWindow(window);
     }
 
+    SDL_SetWindowRelativeMouseMode(window, false);
     glDeleteProgram(program);
     SDL_GL_DestroyContext(context);
     SDL_DestroyWindow(window);
