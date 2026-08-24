@@ -6,23 +6,19 @@
 #include <Jolt/Jolt.h>
 #include <Jolt/Physics/Body/BodyID.h>
 
+#include "controller_io.hpp"
+
 namespace JPH {
 class BodyInterface;
 }
-
-enum class MotorId {
-    FrontLeft,
-    FrontRight,
-    RearRight,
-    RearLeft,
-};
 
 class Drone {
 public:
     explicit Drone(JPH::BodyInterface &bodies);
 
     JPH::BodyID GetBodyID() const;
-    void SetMotorCommand(MotorId id, float command);
+    void SetMotorTargets(const TargetDrone &targets);
+    void UpdateMotors();
 
     void Reset(JPH::BodyInterface &bodies) const;
     void ApplyForces(JPH::BodyInterface &bodies);
@@ -34,7 +30,7 @@ private:
         JPH::Vec3 local_thrust_direction;
         JPH::Vec3 local_reaction_torque_direction;
 
-        float command = 0.0f;
+        float target = 0.0f;
         float speed_rad_per_second = 0.0f;
         float max_speed_rad_per_second = 0.0f;
         float thrust_coefficient = 0.0f;

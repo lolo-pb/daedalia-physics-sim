@@ -32,6 +32,7 @@
 
 #include "controller.hpp"
 #include "drone.hpp"
+#include "ideal_imu.hpp"
 
 namespace {
 
@@ -214,6 +215,7 @@ int main() {
         object_layer_pair_filter);
     float gravity[] = {0.0f, -9.81f, 0.0f};
     physics.SetGravity(JPH::Vec3(gravity[0], gravity[1], gravity[2]));
+    double physics_step = 1.0 / 120.0;
 
     JPH::BodyInterface &bodies = physics.GetBodyInterface();
     const JPH::BodyCreationSettings floor_settings(
@@ -226,6 +228,17 @@ int main() {
 
     Drone drone(bodies);
     const JPH::BodyID drone_id = drone.GetBodyID();
+    IdealImuModel imu_model;
+    imu_model.Reset(bodies.GetLinearVelocity(drone_id));
+    double simulation_time = 0.0;
+    ImuSample latest_imu_sample = imu_model.Sample(
+        simulation_time,
+        static_cast<float>(physics_step),
+        bodies.GetRotation(drone_id),
+        bodies.GetAngularVelocity(drone_id),
+        bodies.GetLinearVelocity(drone_id),
+        physics.GetGravity());
+    TargetDrone target_drone;
 
     if (!SDL_Init(SDL_INIT_VIDEO)) {
         std::fprintf(stderr, "SDL initialization failed: %s\n", SDL_GetError());
@@ -275,7 +288,6 @@ int main() {
     Camera camera;
     auto previous_time = std::chrono::steady_clock::now();
     double accumulator = 0.0;
-    double physics_step = 1.0 / 120.0;
     while (running) {
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
@@ -316,6 +328,15 @@ int main() {
         ImGui::SameLine();
         if (ImGui::Button("Reset")) {
             drone.Reset(bodies);
+            imu_model.Reset(bodies.GetLinearVelocity(drone_id));
+            simulation_time = 0.0;
+            latest_imu_sample = imu_model.Sample(
+                simulation_time,
+                static_cast<float>(physics_step),
+                bodies.GetRotation(drone_id),
+                bodies.GetAngularVelocity(drone_id),
+                bodies.GetLinearVelocity(drone_id),
+                physics.GetGravity());
             accumulator = 0.0;
         }
         if (ImGui::DragFloat3("Gravity", gravity, 0.1f)) {
@@ -345,6 +366,18 @@ int main() {
         ImGui::Text("Linear velocity: %.3f, %.3f, %.3f", linear_velocity.GetX(), linear_velocity.GetY(), linear_velocity.GetZ());
         ImGui::Text("Angular velocity: %.3f, %.3f, %.3f", angular_velocity.GetX(), angular_velocity.GetY(), angular_velocity.GetZ());
         ImGui::Text("Mass: %.3f", mass);
+        ImGui::SeparatorText("Controller IMU");
+        ImGui::Text("Timestamp: %.3f s", latest_imu_sample.timestamp_seconds);
+        ImGui::Text(
+            "Gyro (body, rad/s): %.3f, %.3f, %.3f",
+            latest_imu_sample.body_gyro_rad_per_second.x,
+            latest_imu_sample.body_gyro_rad_per_second.y,
+            latest_imu_sample.body_gyro_rad_per_second.z);
+        ImGui::Text(
+            "Specific force (body, m/s^2): %.3f, %.3f, %.3f",
+            latest_imu_sample.body_specific_force_meters_per_second_squared.x,
+            latest_imu_sample.body_specific_force_meters_per_second_squared.y,
+            latest_imu_sample.body_specific_force_meters_per_second_squared.z);
         ImGui::End();
 
         const bool *keys = SDL_GetKeyboardState(nullptr);
@@ -362,9 +395,23 @@ int main() {
         }
 
         const auto update_physics = [&] {
-            UpdateDemoController(drone);
+            latest_imu_sample = imu_model.Sample(
+                simulation_time,
+                static_cast<float>(physics_step),
+                bodies.GetRotation(drone_id),
+                bodies.GetAngularVelocity(drone_id),
+                bodies.GetLinearVelocity(drone_id),
+                physics.GetGravity());
+            const ControllerInput controller_input{
+                latest_imu_sample,
+                static_cast<float>(physics_step),
+            };
+            UpdateDemoController(controller_input, target_drone);
+            drone.SetMotorTargets(target_drone);
+            drone.UpdateMotors();
             drone.ApplyForces(bodies);
             physics.Update(static_cast<float>(physics_step), 1, &temp_allocator, &job_system);
+            simulation_time += physics_step;
         };
         if (single_step) {
             update_physics();

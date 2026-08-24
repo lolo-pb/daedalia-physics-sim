@@ -12,19 +12,23 @@ cmake --build build
 
 The app has a free-fly camera and a small ImGui physics panel for inspecting the drone and controlling the simulation. The drone layout and motor model are in `src/drone.*`; controller code writes normalized motor commands in `src/controller.*`.
 
-## Drone and controller API
+## Controller and simulation models
 
-`Drone` is one Jolt rigid body with four private motors. Each motor has a local attachment position, a local thrust direction, and a local reaction-torque direction. Directions are transformed with the drone body each physics step.
+`src/controller_io.hpp` is the shared, physics-independent controller contract. A controller receives an `ImuSample`, fixed timestep, and a simulator-owned `TargetDrone` that exposes only four normalized motor targets. `TargetDrone::SetMotorTarget` clamps each target to `0.0` through `1.0`.
 
-Controllers only write a motor command in the range `0.0` to `1.0`:
+The fixed-step flow is:
 
-```cpp
-drone.SetMotorCommand(MotorId::FrontLeft, 0.8f);
+```text
+Jolt state -> ideal IMU -> controller -> motor targets -> motor model -> forces/torques -> Jolt update
 ```
 
-Motor order is `FrontLeft`, `FrontRight`, `RearRight`, `RearLeft`. Front is local `-Z`; left is local `-X`.
+`src/ideal_imu.*` is where sensor behavior is programmed. It currently converts Jolt truth into ideal body-frame gyro and specific force. It derives acceleration from velocity history, which is reset with the drone.
 
-Commands outside the range are clamped. Controllers cannot alter motor placement, directions, speed limits, or thrust/torque coefficients. There is no motor lag yet: each physics step, speed is `command * max_speed_rad_per_second`. Thrust and reaction torque are calculated from speed squared and then applied to Jolt.
+`Drone` in `src/drone.*` is one Jolt rigid body with four private motors. Each motor keeps its normalized target separate from its physical speed. `SetMotorTargets`, `UpdateMotors`, and `ApplyForces` are separate phases. Motor speed behavior is programmed in `UpdateMotors`; thrust and reaction torque behavior is programmed in `ApplyForces`. The current model has no lag and both forces remain proportional to speed squared.
+
+Motor order is `FrontLeft`, `FrontRight`, `RearRight`, `RearLeft`. Local `+X` is right, `+Y` is up, and `-Z` is front.
+
+Ground-truth position, attitude, and velocities remain available only to simulation and the debug UI. The UI also shows the latest controller-facing IMU sample.
 
 ## Future work
 

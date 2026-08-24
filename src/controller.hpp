@@ -1,5 +1,5 @@
 #pragma once
 
-class Drone;
+#include "controller_io.hpp"
 
-void UpdateDemoController(Drone &drone);
+void UpdateDemoController(const ControllerInput &input, TargetDrone &drone);

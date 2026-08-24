@@ -1,7 +1,5 @@
 #include "drone.hpp"
 
-#include <algorithm>
-
 #include <Jolt/Physics/Body/BodyCreationSettings.h>
 #include <Jolt/Physics/Body/BodyInterface.h>
 #include <Jolt/Physics/Collision/Shape/BoxShape.h>
@@ -36,8 +34,17 @@ JPH::BodyID Drone::GetBodyID() const {
     return body_id_;
 }
 
-void Drone::SetMotorCommand(MotorId id, float command) {
-    motors_[static_cast<std::size_t>(id)].command = std::clamp(command, 0.0f, 1.0f);
+void Drone::SetMotorTargets(const TargetDrone &targets) {
+    motors_[0].target = targets.GetMotorTarget(MotorId::FrontLeft);
+    motors_[1].target = targets.GetMotorTarget(MotorId::FrontRight);
+    motors_[2].target = targets.GetMotorTarget(MotorId::RearRight);
+    motors_[3].target = targets.GetMotorTarget(MotorId::RearLeft);
+}
+
+void Drone::UpdateMotors() {
+    for (Motor &motor : motors_) {
+        motor.speed_rad_per_second = motor.target * motor.max_speed_rad_per_second;
+    }
 }
 
 void Drone::Reset(JPH::BodyInterface &bodies) const {
@@ -50,8 +57,7 @@ void Drone::ApplyForces(JPH::BodyInterface &bodies) {
     const JPH::RVec3 position = bodies.GetPosition(body_id_);
     const JPH::Quat rotation = bodies.GetRotation(body_id_);
 
-    for (Motor &motor : motors_) {
-        motor.speed_rad_per_second = std::clamp(motor.command, 0.0f, 1.0f) * motor.max_speed_rad_per_second;
+    for (const Motor &motor : motors_) {
         const float speed_squared = motor.speed_rad_per_second * motor.speed_rad_per_second;
         const float thrust = motor.thrust_coefficient * speed_squared;
         const float reaction_torque = motor.reaction_torque_coefficient * speed_squared;
