@@ -9,6 +9,10 @@
 #include <glad/gl.h>
 #include <SDL3/SDL.h>
 
+#include <imgui.h>
+#include <imgui_impl_opengl3.h>
+#include <imgui_impl_sdl3.h>
+
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/ext/quaternion_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -19,6 +23,7 @@
 #include <Jolt/Core/TempAllocator.h>
 #include <Jolt/Physics/Body/BodyCreationSettings.h>
 #include <Jolt/Physics/Body/BodyInterface.h>
+#include <Jolt/Physics/Body/BodyLock.h>
 #include <Jolt/Physics/Collision/BroadPhase/BroadPhaseLayer.h>
 #include <Jolt/Physics/Collision/ObjectLayer.h>
 #include <Jolt/Physics/Collision/Shape/BoxShape.h>
@@ -204,7 +209,8 @@ int main() {
         broad_phase_layer_interface,
         object_vs_broad_phase_layer_filter,
         object_layer_pair_filter);
-    physics.SetGravity(JPH::Vec3(0.0f, -9.81f, 0.0f));
+    float gravity[] = {0.0f, -9.81f, 0.0f};
+    physics.SetGravity(JPH::Vec3(gravity[0], gravity[1], gravity[2]));
 
     JPH::BodyInterface &bodies = physics.GetBodyInterface();
     const JPH::BodyCreationSettings floor_settings(
@@ -215,10 +221,12 @@ int main() {
         Layers::Static);
     bodies.CreateAndAddBody(floor_settings, JPH::EActivation::DontActivate);
 
+    const JPH::RVec3 box_start_position(0.0, 5.0, 0.0);
+    const JPH::Quat box_start_rotation = JPH::Quat::sIdentity();
     const JPH::BodyCreationSettings box_settings(
         new JPH::BoxShape(JPH::Vec3(0.5f, 0.5f, 0.5f)),
-        JPH::RVec3(0.0, 5.0, 0.0),
-        JPH::Quat::sIdentity(),
+        box_start_position,
+        box_start_rotation,
         JPH::EMotionType::Dynamic,
         Layers::Moving);
     const JPH::BodyID box_id = bodies.CreateAndAddBody(box_settings, JPH::EActivation::Activate);
@@ -241,6 +249,11 @@ int main() {
         return EXIT_FAILURE;
     }
     SDL_GL_SetSwapInterval(1);
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGui::StyleColorsDark();
+    ImGui_ImplSDL3_InitForOpenGL(window, context);
+    ImGui_ImplOpenGL3_Init("#version 450");
 
     constexpr float cube_vertices[] = {
         -0.5f,-0.5f, 0.5f, 0, 0, 1,  0.5f,-0.5f, 0.5f, 0, 0, 1,  0.5f, 0.5f, 0.5f, 0, 0, 1,  -0.5f,-0.5f, 0.5f, 0, 0, 1,  0.5f, 0.5f, 0.5f, 0, 0, 1,  -0.5f, 0.5f, 0.5f, 0, 0, 1,
@@ -261,17 +274,20 @@ int main() {
 
     bool running = true;
     bool looking = false;
+    bool paused = false;
+    bool single_step = false;
     Camera camera;
     auto previous_time = std::chrono::steady_clock::now();
     double accumulator = 0.0;
-    constexpr double physics_step = 1.0 / 120.0;
+    double physics_step = 1.0 / 120.0;
     while (running) {
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
+            ImGui_ImplSDL3_ProcessEvent(&event);
             if (event.type == SDL_EVENT_QUIT) {
                 running = false;
             }
-            if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN && event.button.button == SDL_BUTTON_RIGHT) {
+            if (!ImGui::GetIO().WantCaptureMouse && event.type == SDL_EVENT_MOUSE_BUTTON_DOWN && event.button.button == SDL_BUTTON_RIGHT) {
                 looking = true;
                 SDL_SetWindowRelativeMouseMode(window, true);
             }
@@ -288,22 +304,78 @@ int main() {
         const auto now = std::chrono::steady_clock::now();
         const float frame_seconds = static_cast<float>(std::min(0.25, std::chrono::duration<double>(now - previous_time).count()));
         previous_time = now;
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplSDL3_NewFrame();
+        ImGui::NewFrame();
+
+        ImGui::Begin("Physics");
+        if (ImGui::Button(paused ? "Resume" : "Pause")) {
+            paused = !paused;
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Single step")) {
+            paused = true;
+            single_step = true;
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Reset")) {
+            bodies.SetPositionAndRotation(box_id, box_start_position, box_start_rotation, JPH::EActivation::Activate);
+            bodies.SetLinearVelocity(box_id, JPH::Vec3::sZero());
+            bodies.SetAngularVelocity(box_id, JPH::Vec3::sZero());
+            accumulator = 0.0;
+        }
+        if (ImGui::DragFloat3("Gravity", gravity, 0.1f)) {
+            physics.SetGravity(JPH::Vec3(gravity[0], gravity[1], gravity[2]));
+        }
+        float timestep_milliseconds = static_cast<float>(physics_step * 1000.0);
+        if (ImGui::SliderFloat("Timestep (ms)", &timestep_milliseconds, 1.0f, 33.333f, "%.3f")) {
+            physics_step = timestep_milliseconds / 1000.0;
+            accumulator = std::min(accumulator, physics_step);
+        }
+
+        const JPH::RVec3 inspected_position = bodies.GetPosition(box_id);
+        const JPH::Quat inspected_rotation = bodies.GetRotation(box_id);
+        const JPH::Vec3 linear_velocity = bodies.GetLinearVelocity(box_id);
+        const JPH::Vec3 angular_velocity = bodies.GetAngularVelocity(box_id);
+        float mass = 0.0f;
+        {
+            JPH::BodyLockRead lock(physics.GetBodyLockInterface(), box_id);
+            if (lock.Succeeded()) {
+                mass = 1.0f / lock.GetBody().GetMotionProperties()->GetInverseMass();
+            }
+        }
+        ImGui::SeparatorText("Box");
+        ImGui::Text("Position: %.3f, %.3f, %.3f", inspected_position.GetX(), inspected_position.GetY(), inspected_position.GetZ());
+        ImGui::Text("Rotation: %.3f, %.3f, %.3f, %.3f", inspected_rotation.GetX(), inspected_rotation.GetY(), inspected_rotation.GetZ(), inspected_rotation.GetW());
+        ImGui::Text("Linear velocity: %.3f, %.3f, %.3f", linear_velocity.GetX(), linear_velocity.GetY(), linear_velocity.GetZ());
+        ImGui::Text("Angular velocity: %.3f, %.3f, %.3f", angular_velocity.GetX(), angular_velocity.GetY(), angular_velocity.GetZ());
+        ImGui::Text("Mass: %.3f", mass);
+        ImGui::End();
+
         const bool *keys = SDL_GetKeyboardState(nullptr);
         const float movement_speed = (keys[SDL_SCANCODE_LSHIFT] || keys[SDL_SCANCODE_RSHIFT] ? 15.0f : 5.0f) * frame_seconds;
         const glm::vec3 forward = camera.Forward();
         const glm::vec3 horizontal_forward = glm::normalize(glm::vec3(forward.x, 0.0f, forward.z));
         const glm::vec3 right = glm::normalize(glm::cross(horizontal_forward, glm::vec3(0.0f, 1.0f, 0.0f)));
-        if (keys[SDL_SCANCODE_W]) camera.position += horizontal_forward * movement_speed;
-        if (keys[SDL_SCANCODE_S]) camera.position -= horizontal_forward * movement_speed;
-        if (keys[SDL_SCANCODE_D]) camera.position += right * movement_speed;
-        if (keys[SDL_SCANCODE_A]) camera.position -= right * movement_speed;
-        if (keys[SDL_SCANCODE_SPACE]) camera.position.y += movement_speed;
-        if (keys[SDL_SCANCODE_LCTRL] || keys[SDL_SCANCODE_RCTRL]) camera.position.y -= movement_speed;
+        if (!ImGui::GetIO().WantCaptureKeyboard) {
+            if (keys[SDL_SCANCODE_W]) camera.position += horizontal_forward * movement_speed;
+            if (keys[SDL_SCANCODE_S]) camera.position -= horizontal_forward * movement_speed;
+            if (keys[SDL_SCANCODE_D]) camera.position += right * movement_speed;
+            if (keys[SDL_SCANCODE_A]) camera.position -= right * movement_speed;
+            if (keys[SDL_SCANCODE_SPACE]) camera.position.y += movement_speed;
+            if (keys[SDL_SCANCODE_LCTRL] || keys[SDL_SCANCODE_RCTRL]) camera.position.y -= movement_speed;
+        }
 
-        accumulator += frame_seconds;
-        while (accumulator >= physics_step) {
+        if (single_step) {
             physics.Update(static_cast<float>(physics_step), 1, &temp_allocator, &job_system);
-            accumulator -= physics_step;
+            accumulator = 0.0;
+            single_step = false;
+        } else if (!paused) {
+            accumulator += frame_seconds;
+            while (accumulator >= physics_step) {
+                physics.Update(static_cast<float>(physics_step), 1, &temp_allocator, &job_system);
+                accumulator -= physics_step;
+            }
         }
 
         int width = 0;
@@ -324,10 +396,15 @@ int main() {
         const glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(position.GetX(), position.GetY(), position.GetZ()))
             * glm::mat4_cast(glm::quat(rotation.GetW(), rotation.GetX(), rotation.GetY(), rotation.GetZ()));
         DrawMesh(cube, program, model, glm::vec3(0.85f, 0.35f, 0.15f));
+        ImGui::Render();
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         SDL_GL_SwapWindow(window);
     }
 
     SDL_SetWindowRelativeMouseMode(window, false);
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplSDL3_Shutdown();
+    ImGui::DestroyContext();
     glDeleteProgram(program);
     SDL_GL_DestroyContext(context);
     SDL_DestroyWindow(window);

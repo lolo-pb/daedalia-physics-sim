@@ -47,7 +47,24 @@ endif()
 add_library(glad STATIC "${GLAD_OUTPUT_DIR}/src/gl.c")
 target_include_directories(glad PUBLIC "${GLAD_OUTPUT_DIR}/include")
 
+FetchContent_Declare(
+    imgui
+    URL https://github.com/ocornut/imgui/archive/refs/tags/v1.91.9b.tar.gz
+)
+FetchContent_Populate(imgui)
+add_library(imgui STATIC
+    ${imgui_SOURCE_DIR}/imgui.cpp
+    ${imgui_SOURCE_DIR}/imgui_draw.cpp
+    ${imgui_SOURCE_DIR}/imgui_tables.cpp
+    ${imgui_SOURCE_DIR}/imgui_widgets.cpp
+    ${imgui_SOURCE_DIR}/backends/imgui_impl_sdl3.cpp
+    ${imgui_SOURCE_DIR}/backends/imgui_impl_opengl3.cpp
+)
+target_include_directories(imgui PUBLIC ${imgui_SOURCE_DIR} ${imgui_SOURCE_DIR}/backends)
+target_compile_definitions(imgui PRIVATE IMGUI_IMPL_OPENGL_LOADER_GLAD2)
+target_link_libraries(imgui PRIVATE SDL3::SDL3 glad OpenGL::GL)
+
 find_package(OpenGL REQUIRED)
 
 add_executable(daedalia src/main.cpp)
-target_link_libraries(daedalia PRIVATE SDL3::SDL3 Jolt glm::glm glad OpenGL::GL)
+target_link_libraries(daedalia PRIVATE SDL3::SDL3 Jolt glm::glm glad imgui OpenGL::GL)

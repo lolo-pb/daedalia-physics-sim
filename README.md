@@ -17,3 +17,7 @@ CMake downloads the project dependencies on first configuration.
 - Hold right mouse button to look around.
 - `W` `A` `S` `D` move.
 - `Space` rises; `Ctrl` descends; `Shift` boosts movement speed.
+
+## Physics panel
+
+Use the `Physics` panel to pause, reset, or single-step the simulation, change gravity and the fixed timestep, and inspect the box state.

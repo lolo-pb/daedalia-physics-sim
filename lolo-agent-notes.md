@@ -10,8 +10,9 @@ cmake --build build
 ./build/daedalia
 ```
 
+The app has a free-fly camera and a small ImGui physics panel for inspecting the box and controlling the simulation.
+
 ## Future work
 
 - Drone-building API: simple rigid bodies with named motor and force points.
-- Debug UI, camera controls, and physics visualisation.
-- Saved scenarios and experimental force models.
+- Physics visualisation, saved scenarios, and experimental force models.
