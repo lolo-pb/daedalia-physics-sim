@@ -326,6 +326,7 @@ int main() {
         }
         if (ImGui::DragFloat3("Gravity", gravity, 0.1f)) {
             physics.SetGravity(JPH::Vec3(gravity[0], gravity[1], gravity[2]));
+            bodies.ActivateBody(box_id);
         }
         float timestep_milliseconds = static_cast<float>(physics_step * 1000.0);
         if (ImGui::SliderFloat("Timestep (ms)", &timestep_milliseconds, 1.0f, 33.333f, "%.3f")) {
