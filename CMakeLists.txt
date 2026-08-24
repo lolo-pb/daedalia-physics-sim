@@ -66,5 +66,9 @@ target_link_libraries(imgui PRIVATE SDL3::SDL3 glad OpenGL::GL)
 
 find_package(OpenGL REQUIRED)
 
-add_executable(daedalia src/main.cpp)
+add_executable(daedalia
+    src/main.cpp
+    src/drone.cpp
+    src/controller.cpp
+)
 target_link_libraries(daedalia PRIVATE SDL3::SDL3 Jolt glm::glm glad imgui OpenGL::GL)

@@ -30,6 +30,9 @@
 #include <Jolt/Physics/PhysicsSystem.h>
 #include <Jolt/RegisterTypes.h>
 
+#include "controller.hpp"
+#include "drone.hpp"
+
 namespace {
 
 namespace Layers {
@@ -221,15 +224,8 @@ int main() {
         Layers::Static);
     bodies.CreateAndAddBody(floor_settings, JPH::EActivation::DontActivate);
 
-    const JPH::RVec3 box_start_position(0.0, 5.0, 0.0);
-    const JPH::Quat box_start_rotation = JPH::Quat::sIdentity();
-    const JPH::BodyCreationSettings box_settings(
-        new JPH::BoxShape(JPH::Vec3(0.5f, 0.5f, 0.5f)),
-        box_start_position,
-        box_start_rotation,
-        JPH::EMotionType::Dynamic,
-        Layers::Moving);
-    const JPH::BodyID box_id = bodies.CreateAndAddBody(box_settings, JPH::EActivation::Activate);
+    Drone drone(bodies);
+    const JPH::BodyID drone_id = drone.GetBodyID();
 
     if (!SDL_Init(SDL_INIT_VIDEO)) {
         std::fprintf(stderr, "SDL initialization failed: %s\n", SDL_GetError());
@@ -319,14 +315,12 @@ int main() {
         }
         ImGui::SameLine();
         if (ImGui::Button("Reset")) {
-            bodies.SetPositionAndRotation(box_id, box_start_position, box_start_rotation, JPH::EActivation::Activate);
-            bodies.SetLinearVelocity(box_id, JPH::Vec3::sZero());
-            bodies.SetAngularVelocity(box_id, JPH::Vec3::sZero());
+            drone.Reset(bodies);
             accumulator = 0.0;
         }
         if (ImGui::DragFloat3("Gravity", gravity, 0.1f)) {
             physics.SetGravity(JPH::Vec3(gravity[0], gravity[1], gravity[2]));
-            bodies.ActivateBody(box_id);
+            bodies.ActivateBody(drone_id);
         }
         float timestep_milliseconds = static_cast<float>(physics_step * 1000.0);
         if (ImGui::SliderFloat("Timestep (ms)", &timestep_milliseconds, 1.0f, 33.333f, "%.3f")) {
@@ -334,18 +328,18 @@ int main() {
             accumulator = std::min(accumulator, physics_step);
         }
 
-        const JPH::RVec3 inspected_position = bodies.GetPosition(box_id);
-        const JPH::Quat inspected_rotation = bodies.GetRotation(box_id);
-        const JPH::Vec3 linear_velocity = bodies.GetLinearVelocity(box_id);
-        const JPH::Vec3 angular_velocity = bodies.GetAngularVelocity(box_id);
+        const JPH::RVec3 inspected_position = bodies.GetPosition(drone_id);
+        const JPH::Quat inspected_rotation = bodies.GetRotation(drone_id);
+        const JPH::Vec3 linear_velocity = bodies.GetLinearVelocity(drone_id);
+        const JPH::Vec3 angular_velocity = bodies.GetAngularVelocity(drone_id);
         float mass = 0.0f;
         {
-            JPH::BodyLockRead lock(physics.GetBodyLockInterface(), box_id);
+            JPH::BodyLockRead lock(physics.GetBodyLockInterface(), drone_id);
             if (lock.Succeeded()) {
                 mass = 1.0f / lock.GetBody().GetMotionProperties()->GetInverseMass();
             }
         }
-        ImGui::SeparatorText("Box");
+        ImGui::SeparatorText("Drone");
         ImGui::Text("Position: %.3f, %.3f, %.3f", inspected_position.GetX(), inspected_position.GetY(), inspected_position.GetZ());
         ImGui::Text("Rotation: %.3f, %.3f, %.3f, %.3f", inspected_rotation.GetX(), inspected_rotation.GetY(), inspected_rotation.GetZ(), inspected_rotation.GetW());
         ImGui::Text("Linear velocity: %.3f, %.3f, %.3f", linear_velocity.GetX(), linear_velocity.GetY(), linear_velocity.GetZ());
@@ -367,14 +361,19 @@ int main() {
             if (keys[SDL_SCANCODE_LCTRL] || keys[SDL_SCANCODE_RCTRL]) camera.position.y -= movement_speed;
         }
 
-        if (single_step) {
+        const auto update_physics = [&] {
+            UpdateDemoController(drone);
+            drone.ApplyForces(bodies);
             physics.Update(static_cast<float>(physics_step), 1, &temp_allocator, &job_system);
+        };
+        if (single_step) {
+            update_physics();
             accumulator = 0.0;
             single_step = false;
         } else if (!paused) {
             accumulator += frame_seconds;
             while (accumulator >= physics_step) {
-                physics.Update(static_cast<float>(physics_step), 1, &temp_allocator, &job_system);
+                update_physics();
                 accumulator -= physics_step;
             }
         }
@@ -392,11 +391,16 @@ int main() {
         glUniformMatrix4fv(glGetUniformLocation(program, "view_projection"), 1, GL_FALSE, glm::value_ptr(projection * view));
         DrawMesh(plane, program, glm::mat4(1.0f), glm::vec3(0.28f, 0.33f, 0.28f));
 
-        const JPH::RVec3 position = bodies.GetPosition(box_id);
-        const JPH::Quat rotation = bodies.GetRotation(box_id);
-        const glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(position.GetX(), position.GetY(), position.GetZ()))
+        const JPH::RVec3 position = bodies.GetPosition(drone_id);
+        const JPH::Quat rotation = bodies.GetRotation(drone_id);
+        const glm::mat4 transform = glm::translate(glm::mat4(1.0f), glm::vec3(position.GetX(), position.GetY(), position.GetZ()))
             * glm::mat4_cast(glm::quat(rotation.GetW(), rotation.GetX(), rotation.GetY(), rotation.GetZ()));
-        DrawMesh(cube, program, model, glm::vec3(0.85f, 0.35f, 0.15f));
+        DrawMesh(cube, program, transform * glm::scale(glm::mat4(1.0f), glm::vec3(0.5f, 0.16f, 0.5f)), glm::vec3(0.85f, 0.35f, 0.15f));
+        for (const JPH::RVec3 &motor_position : drone.GetMotorWorldPositions(position, rotation)) {
+            const glm::mat4 marker = glm::translate(glm::mat4(1.0f), glm::vec3(motor_position.GetX(), motor_position.GetY(), motor_position.GetZ()))
+                * glm::scale(glm::mat4(1.0f), glm::vec3(0.05f));
+            DrawMesh(cube, program, marker, glm::vec3(0.1f, 0.8f, 0.9f));
+        }
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         SDL_GL_SwapWindow(window);

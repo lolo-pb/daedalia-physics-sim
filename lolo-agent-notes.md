@@ -10,9 +10,8 @@ cmake --build build
 ./build/daedalia
 ```
 
-The app has a free-fly camera and a small ImGui physics panel for inspecting the box and controlling the simulation.
+The app has a free-fly camera and a small ImGui physics panel for inspecting the drone and controlling the simulation. The drone layout and demo controller are C++ code in `src/drone.*` and `src/controller.*`.
 
 ## Future work
 
-- Drone-building API: simple rigid bodies with named motor and force points.
-- Physics visualisation, saved scenarios, and experimental force models.
+- More drone layouts, physics visualisation, saved scenarios, and experimental force models.

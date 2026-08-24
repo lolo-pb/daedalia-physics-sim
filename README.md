@@ -1,6 +1,6 @@
 # Daedalia Physics Sim
 
-Minimal native physics and graphics bootstrap: one box falls onto a ground plane.
+Minimal native physics and graphics bootstrap: a simple quadcopter lifts above a ground plane.
 
 ## Build and run
 
@@ -20,4 +20,4 @@ CMake downloads the project dependencies on first configuration.
 
 ## Physics panel
 
-Use the `Physics` panel to pause, reset, or single-step the simulation, change gravity and the fixed timestep, and inspect the box state.
+Use the `Physics` panel to pause, reset, or single-step the simulation, change gravity and the fixed timestep, and inspect the drone state.
