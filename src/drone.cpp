@@ -16,10 +16,10 @@ const JPH::Quat StartRotation = JPH::Quat::sIdentity();
 
 Drone::Drone(JPH::BodyInterface &bodies) :
     motors_{{
-        {JPH::Vec3(-0.2f, 0.08f, -0.2f), JPH::Vec3(0.0f, 1.0f, 0.0f), JPH::Vec3(0.0f, 1.0f, 0.0f), 0.0f, 0.0f, 5.0f, 0.02f},
-        {JPH::Vec3( 0.2f, 0.08f, -0.2f), JPH::Vec3(0.0f, 1.0f, 0.0f), JPH::Vec3(0.0f,-1.0f, 0.0f), 0.0f, 0.0f, 5.0f, 0.02f},
-        {JPH::Vec3( 0.2f, 0.08f,  0.2f), JPH::Vec3(0.0f, 1.0f, 0.0f), JPH::Vec3(0.0f, 1.0f, 0.0f), 0.0f, 0.0f, 5.0f, 0.02f},
-        {JPH::Vec3(-0.2f, 0.08f,  0.2f), JPH::Vec3(0.0f, 1.0f, 0.0f), JPH::Vec3(0.0f,-1.0f, 0.0f), 0.0f, 0.0f, 5.0f, 0.02f},
+        {JPH::Vec3(-0.2f, 0.08f, -0.2f), JPH::Vec3(0.0f, 1.0f, 0.0f), JPH::Vec3(0.0f, 1.0f, 0.0f), 0.0f, 0.0f, 1000.0f, 5.0e-6f, 2.0e-8f},
+        {JPH::Vec3( 0.2f, 0.08f, -0.2f), JPH::Vec3(0.0f, 1.0f, 0.0f), JPH::Vec3(0.0f,-1.0f, 0.0f), 0.0f, 0.0f, 1000.0f, 5.0e-6f, 2.0e-8f},
+        {JPH::Vec3( 0.2f, 0.08f,  0.2f), JPH::Vec3(0.0f, 1.0f, 0.0f), JPH::Vec3(0.0f, 1.0f, 0.0f), 0.0f, 0.0f, 1000.0f, 5.0e-6f, 2.0e-8f},
+        {JPH::Vec3(-0.2f, 0.08f,  0.2f), JPH::Vec3(0.0f, 1.0f, 0.0f), JPH::Vec3(0.0f,-1.0f, 0.0f), 0.0f, 0.0f, 1000.0f, 5.0e-6f, 2.0e-8f},
     }} {
     JPH::BodyCreationSettings settings(
         new JPH::BoxShape(JPH::Vec3(0.25f, 0.08f, 0.25f)),
@@ -36,12 +36,8 @@ JPH::BodyID Drone::GetBodyID() const {
     return body_id_;
 }
 
-std::array<Motor, 4> &Drone::GetMotors() {
-    return motors_;
-}
-
-const std::array<Motor, 4> &Drone::GetMotors() const {
-    return motors_;
+void Drone::SetMotorCommand(MotorId id, float command) {
+    motors_[static_cast<std::size_t>(id)].command = std::clamp(command, 0.0f, 1.0f);
 }
 
 void Drone::Reset(JPH::BodyInterface &bodies) const {
@@ -50,16 +46,15 @@ void Drone::Reset(JPH::BodyInterface &bodies) const {
     bodies.SetAngularVelocity(body_id_, JPH::Vec3::sZero());
 }
 
-void Drone::ApplyForces(JPH::BodyInterface &bodies) const {
+void Drone::ApplyForces(JPH::BodyInterface &bodies) {
     const JPH::RVec3 position = bodies.GetPosition(body_id_);
     const JPH::Quat rotation = bodies.GetRotation(body_id_);
 
-    for (const Motor &motor : motors_) {
-        const float thrust = std::clamp(motor.thrust_newtons, 0.0f, motor.max_thrust_newtons);
-        const float reaction_torque = std::clamp(
-            motor.reaction_torque_newton_metres,
-            0.0f,
-            motor.max_reaction_torque_newton_metres);
+    for (Motor &motor : motors_) {
+        motor.speed_rad_per_second = std::clamp(motor.command, 0.0f, 1.0f) * motor.max_speed_rad_per_second;
+        const float speed_squared = motor.speed_rad_per_second * motor.speed_rad_per_second;
+        const float thrust = motor.thrust_coefficient * speed_squared;
+        const float reaction_torque = motor.reaction_torque_coefficient * speed_squared;
         const JPH::RVec3 motor_position = position + JPH::RVec3(rotation * motor.local_position);
         bodies.AddForce(body_id_, rotation * motor.local_thrust_direction * thrust, motor_position);
         bodies.AddTorque(body_id_, rotation * motor.local_reaction_torque_direction * reaction_torque);
