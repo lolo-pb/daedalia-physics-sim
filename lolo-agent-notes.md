@@ -32,4 +32,6 @@ Ground-truth position, attitude, and velocities remain available only to simulat
 
 ## Future work
 
+- Build and tune a proper PID flight controller for the quadcopter.
+- Once the quadcopter is stable, try a weird multirotor layout or a helicopter.
 - More drone layouts, physics visualisation, saved scenarios, and experimental force models.
