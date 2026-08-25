@@ -4,6 +4,7 @@
 #include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
+#include <string_view>
 #include <thread>
 
 #include <glad/gl.h>
@@ -187,9 +188,29 @@ void DrawMesh(const Mesh &mesh, GLuint program, const glm::mat4 &model, const gl
     glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(mesh.vertex_count));
 }
 
+template <typename Vector>
+bool IsFiniteVector(const Vector &vector) {
+    return std::isfinite(vector.GetX())
+        && std::isfinite(vector.GetY())
+        && std::isfinite(vector.GetZ());
+}
+
+bool IsFiniteQuaternion(const JPH::Quat &rotation) {
+    return IsFiniteVector(rotation) && std::isfinite(rotation.GetW());
+}
+
+bool IsFiniteImuVector(const ImuVector3 &vector) {
+    return std::isfinite(vector.x)
+        && std::isfinite(vector.y)
+        && std::isfinite(vector.z);
+}
+
 } // namespace
 
-int main() {
+int main(int argument_count, char **arguments) {
+    const bool run_smoke_test = argument_count == 2
+        && std::string_view(arguments[1]) == "--smoke-test";
+
     JPH::Trace = Trace;
 #ifdef JPH_ENABLE_ASSERTS
     JPH::AssertFailed = AssertFailed;
@@ -251,6 +272,58 @@ int main() {
             manual_controller.Reset();
         }
     };
+    const auto update_physics = [&](const ControllerKeys &controller_keys) {
+        latest_imu_sample = imu_model.Sample(
+            simulation_time,
+            static_cast<float>(physics_step),
+            bodies.GetRotation(drone_id),
+            bodies.GetAngularVelocity(drone_id),
+            bodies.GetLinearVelocity(drone_id),
+            physics.GetGravity());
+        const ControllerInput controller_input{
+            latest_imu_sample,
+            static_cast<float>(physics_step),
+            controller_keys,
+        };
+        if (active_controller == FlightController::Demo) {
+            UpdateDemoController(controller_input, target_drone);
+        } else {
+            manual_controller.Update(controller_input, target_drone);
+        }
+        drone.SetMotorTargets(target_drone);
+        drone.UpdateMotors();
+        drone.ApplyForces(bodies);
+        physics.Update(static_cast<float>(physics_step), 1, &temp_allocator, &job_system);
+        simulation_time += physics_step;
+    };
+
+    if (run_smoke_test) {
+        constexpr int SmokeTestSteps = 120;
+        for (int step = 0; step < SmokeTestSteps; ++step) {
+            update_physics(ControllerKeys{});
+        }
+
+        const bool state_is_valid =
+            bodies.IsAdded(drone_id)
+            && IsFiniteVector(bodies.GetPosition(drone_id))
+            && IsFiniteQuaternion(bodies.GetRotation(drone_id))
+            && IsFiniteVector(bodies.GetLinearVelocity(drone_id))
+            && IsFiniteVector(bodies.GetAngularVelocity(drone_id))
+            && IsFiniteImuVector(latest_imu_sample.body_gyro_rad_per_second)
+            && IsFiniteImuVector(latest_imu_sample.body_specific_force_meters_per_second_squared)
+            && simulation_time > 0.99
+            && target_drone.GetMotorTarget(MotorId::FrontLeft) == 0.8f
+            && target_drone.GetMotorTarget(MotorId::FrontRight) == 0.8f
+            && target_drone.GetMotorTarget(MotorId::RearRight) == 0.8f
+            && target_drone.GetMotorTarget(MotorId::RearLeft) == 0.8f;
+
+        if (!state_is_valid) {
+            std::fprintf(stderr, "Simulation smoke test failed\n");
+            return EXIT_FAILURE;
+        }
+        std::printf("Simulation smoke test passed\n");
+        return EXIT_SUCCESS;
+    }
 
     if (!SDL_Init(SDL_INIT_VIDEO)) {
         std::fprintf(stderr, "SDL initialization failed: %s\n", SDL_GetError());
@@ -453,38 +526,14 @@ int main() {
             controller_keys.f = keys[SDL_SCANCODE_F];
         }
 
-        const auto update_physics = [&] {
-            latest_imu_sample = imu_model.Sample(
-                simulation_time,
-                static_cast<float>(physics_step),
-                bodies.GetRotation(drone_id),
-                bodies.GetAngularVelocity(drone_id),
-                bodies.GetLinearVelocity(drone_id),
-                physics.GetGravity());
-            const ControllerInput controller_input{
-                latest_imu_sample,
-                static_cast<float>(physics_step),
-                controller_keys,
-            };
-            if (active_controller == FlightController::Demo) {
-                UpdateDemoController(controller_input, target_drone);
-            } else {
-                manual_controller.Update(controller_input, target_drone);
-            }
-            drone.SetMotorTargets(target_drone);
-            drone.UpdateMotors();
-            drone.ApplyForces(bodies);
-            physics.Update(static_cast<float>(physics_step), 1, &temp_allocator, &job_system);
-            simulation_time += physics_step;
-        };
         if (single_step) {
-            update_physics();
+            update_physics(controller_keys);
             accumulator = 0.0;
             single_step = false;
         } else if (!paused) {
             accumulator += frame_seconds;
             while (accumulator >= physics_step) {
-                update_physics();
+                update_physics(controller_keys);
                 accumulator -= physics_step;
             }
         }

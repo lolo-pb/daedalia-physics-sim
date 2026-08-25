@@ -32,6 +32,14 @@ cmake --build build
 
 CMake downloads SDL, Jolt Physics, GLM, glad, and Dear ImGui during the first configuration.
 
+Run the headless simulation smoke test with:
+
+```sh
+ctest --test-dir build --output-on-failure
+```
+
+The smoke test initializes and steps the real physics simulation without opening a window.
+
 ## Controls
 
 - Hold the right mouse button and move the mouse to look around.

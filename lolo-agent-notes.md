@@ -10,6 +10,14 @@ cmake --build build
 ./build/daedalia
 ```
 
+Run the headless simulation smoke test with:
+
+```sh
+ctest --test-dir build --output-on-failure
+```
+
+The smoke test uses the app's real fixed-step physics path but exits before SDL and window setup.
+
 The app has a free-fly camera and a small ImGui physics panel for inspecting the drone, controlling the simulation, and switching flight controllers. The drone layout and motor model are in `src/drone.*`; controller code lives in `src/controllers/` and writes normalized motor commands.
 
 ## Controller and simulation models
