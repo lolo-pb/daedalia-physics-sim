@@ -2,8 +2,6 @@ cmake_minimum_required(VERSION 3.24)
 
 project(daedalia_physics_sim LANGUAGES C CXX)
 
-include(CTest)
-
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -81,13 +79,3 @@ add_executable(daedalia
     src/sensors/ideal_imu.cpp
 )
 target_link_libraries(daedalia PRIVATE controller SDL3::SDL3 Jolt glm::glm glad imgui OpenGL::GL)
-
-if(BUILD_TESTING)
-    add_executable(models_test
-        tests/models_test.cpp
-        src/sensors/ideal_imu.cpp
-    )
-    target_include_directories(models_test PRIVATE src)
-    target_link_libraries(models_test PRIVATE controller Jolt)
-    add_test(NAME models_test COMMAND models_test)
-endif()

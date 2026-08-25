@@ -38,6 +38,23 @@ float UpdatePid(float error, float measured_rate, float timestep,
                     -CorrectionLimit, CorrectionLimit);
 }
 
+void MixMotorTargets(TargetDrone &drone, float throttle,
+                     float pitch_correction, float roll_correction,
+                     float yaw_correction) {
+  drone.SetMotorTarget(MotorId::FrontLeft,
+                       throttle + pitch_correction - roll_correction +
+                           yaw_correction);
+  drone.SetMotorTarget(MotorId::FrontRight,
+                       throttle + pitch_correction + roll_correction -
+                           yaw_correction);
+  drone.SetMotorTarget(MotorId::RearRight,
+                       throttle - pitch_correction + roll_correction +
+                           yaw_correction);
+  drone.SetMotorTarget(MotorId::RearLeft,
+                       throttle - pitch_correction - roll_correction -
+                           yaw_correction);
+}
+
 } // namespace
 
 void AttitudeController::Reset() {
@@ -59,8 +76,27 @@ void AttitudeController::Update(const ControllerInput &input,
   }
 
   const ImuVector3 &gyro = input.imu.body_gyro_rad_per_second;
+  UpdateAttitudeEstimate(input.imu, timestep);
+
+  const float pitch_correction =
+      UpdatePid(WrapAngle(setpoint.pitch_rad - pitch_rad_), gyro.x, timestep,
+                PitchGains, pitch_integral_);
+  const float roll_correction =
+      UpdatePid(WrapAngle(setpoint.roll_rad - roll_rad_), gyro.z, timestep,
+                RollGains, roll_integral_);
+  const float yaw_correction =
+      UpdatePid(WrapAngle(setpoint.yaw_rad - yaw_rad_), gyro.y, timestep,
+                YawGains, yaw_integral_);
+
+  MixMotorTargets(drone, setpoint.throttle, pitch_correction, roll_correction,
+                  yaw_correction);
+}
+
+void AttitudeController::UpdateAttitudeEstimate(const ImuSample &imu,
+                                                 float timestep) {
+  const ImuVector3 &gyro = imu.body_gyro_rad_per_second;
   const ImuVector3 &acceleration =
-      input.imu.body_specific_force_meters_per_second_squared;
+      imu.body_specific_force_meters_per_second_squared;
   const float acceleration_squared = acceleration.x * acceleration.x +
                                      acceleration.y * acceleration.y +
                                      acceleration.z * acceleration.z;
@@ -86,26 +122,4 @@ void AttitudeController::Update(const ControllerInput &input,
       roll_rad_ = BlendAngle(roll_rad_, accelerometer_roll);
     }
   }
-
-  const float pitch_correction =
-      UpdatePid(WrapAngle(setpoint.pitch_rad - pitch_rad_), gyro.x, timestep,
-                PitchGains, pitch_integral_);
-  const float roll_correction =
-      UpdatePid(WrapAngle(setpoint.roll_rad - roll_rad_), gyro.z, timestep,
-                RollGains, roll_integral_);
-  const float yaw_correction =
-      UpdatePid(WrapAngle(setpoint.yaw_rad - yaw_rad_), gyro.y, timestep,
-                YawGains, yaw_integral_);
-
-  drone.SetMotorTarget(MotorId::FrontLeft,
-                       setpoint.throttle + pitch_correction - roll_correction +
-                           yaw_correction);
-  drone.SetMotorTarget(MotorId::FrontRight,
-                       setpoint.throttle + pitch_correction + roll_correction -
-                           yaw_correction);
-  drone.SetMotorTarget(MotorId::RearRight,
-                       setpoint.throttle - pitch_correction + roll_correction +
-                           yaw_correction);
-  drone.SetMotorTarget(MotorId::RearLeft, setpoint.throttle - pitch_correction -
-                                              roll_correction - yaw_correction);
 }

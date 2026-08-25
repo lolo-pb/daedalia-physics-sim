@@ -20,6 +20,8 @@ public:
         TargetDrone &drone);
 
 private:
+    void UpdateAttitudeEstimate(const ImuSample &imu, float timestep);
+
     float pitch_rad_ = 0.0f;
     float roll_rad_ = 0.0f;
     float yaw_rad_ = 0.0f;

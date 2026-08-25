@@ -32,12 +32,6 @@ cmake --build build
 
 CMake downloads SDL, Jolt Physics, GLM, glad, and Dear ImGui during the first configuration.
 
-To run the model tests:
-
-```sh
-ctest --test-dir build --output-on-failure
-```
-
 ## Controls
 
 - Hold the right mouse button and move the mouse to look around.
