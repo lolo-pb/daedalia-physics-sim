@@ -163,6 +163,28 @@ struct Camera {
             std::sin(pitch_radians),
             std::sin(yaw_radians) * std::cos(pitch_radians)));
     }
+
+    void LookAt(const glm::vec3 &target) {
+        const glm::vec3 offset = target - position;
+        if (glm::length(offset) == 0.0f) {
+            return;
+        }
+
+        const glm::vec3 direction = glm::normalize(offset);
+        yaw = glm::degrees(std::atan2(direction.z, direction.x));
+        pitch = glm::degrees(std::asin(std::clamp(direction.y, -1.0f, 1.0f)));
+    }
+
+    void OrbitAround(const glm::vec3 &target, float yaw_delta, float pitch_delta) {
+        const float distance = glm::length(position - target);
+        if (distance == 0.0f) {
+            return;
+        }
+
+        yaw += yaw_delta;
+        pitch = std::clamp(pitch + pitch_delta, -89.0f, 89.0f);
+        position = target - Forward() * distance;
+    }
 };
 
 Mesh CreateMesh(const float *vertices, GLuint vertex_count) {
@@ -205,6 +227,10 @@ bool IsFiniteImuVector(const ImuVector3 &vector) {
         && std::isfinite(vector.z);
 }
 
+glm::vec3 ToGlm(const JPH::RVec3 &vector) {
+    return glm::vec3(vector.GetX(), vector.GetY(), vector.GetZ());
+}
+
 } // namespace
 
 int main(int argument_count, char **arguments) {
@@ -238,7 +264,8 @@ int main(int argument_count, char **arguments) {
         object_layer_pair_filter);
     float gravity[] = {0.0f, -9.81f, 0.0f};
     physics.SetGravity(JPH::Vec3(gravity[0], gravity[1], gravity[2]));
-    double physics_step = 1.0 / 120.0;
+    int physics_frequency_hz = 30;
+    double physics_step = 1.0 / static_cast<double>(physics_frequency_hz);
 
     JPH::BodyInterface &bodies = physics.GetBodyInterface();
     const JPH::BodyCreationSettings floor_settings(
@@ -298,8 +325,7 @@ int main(int argument_count, char **arguments) {
     };
 
     if (run_smoke_test) {
-        constexpr int SmokeTestSteps = 120;
-        for (int step = 0; step < SmokeTestSteps; ++step) {
+        for (int step = 0; step < physics_frequency_hz; ++step) {
             update_physics(ControllerKeys{});
         }
 
@@ -370,7 +396,9 @@ int main(int argument_count, char **arguments) {
     bool looking = false;
     bool paused = false;
     bool single_step = false;
+    bool follow_drone = false;
     Camera camera;
+    glm::vec3 previous_drone_position = ToGlm(bodies.GetPosition(drone_id));
     auto previous_time = std::chrono::steady_clock::now();
     double accumulator = 0.0;
     while (running) {
@@ -404,8 +432,15 @@ int main(int argument_count, char **arguments) {
                 SDL_SetWindowRelativeMouseMode(window, false);
             }
             if (looking && event.type == SDL_EVENT_MOUSE_MOTION) {
-                camera.yaw += event.motion.xrel * 0.1f;
-                camera.pitch = std::clamp(camera.pitch - event.motion.yrel * 0.1f, -89.0f, 89.0f);
+                if (follow_drone) {
+                    camera.OrbitAround(
+                        ToGlm(bodies.GetPosition(drone_id)),
+                        event.motion.xrel * 0.1f,
+                        -event.motion.yrel * 0.1f);
+                } else {
+                    camera.yaw += event.motion.xrel * 0.1f;
+                    camera.pitch = std::clamp(camera.pitch - event.motion.yrel * 0.1f, -89.0f, 89.0f);
+                }
             }
         }
 
@@ -459,10 +494,15 @@ int main(int argument_count, char **arguments) {
             physics.SetGravity(JPH::Vec3(gravity[0], gravity[1], gravity[2]));
             bodies.ActivateBody(drone_id);
         }
-        float timestep_milliseconds = static_cast<float>(physics_step * 1000.0);
-        if (ImGui::SliderFloat("Timestep (ms)", &timestep_milliseconds, 1.0f, 33.333f, "%.3f")) {
-            physics_step = timestep_milliseconds / 1000.0;
+        if (ImGui::SliderInt("Physics frequency (Hz)", &physics_frequency_hz, 1, 120)) {
+            physics_step = 1.0 / static_cast<double>(physics_frequency_hz);
             accumulator = std::min(accumulator, physics_step);
+        }
+
+        ImGui::SeparatorText("Camera");
+        if (ImGui::Checkbox("Follow drone", &follow_drone) && follow_drone) {
+            previous_drone_position = ToGlm(bodies.GetPosition(drone_id));
+            camera.LookAt(previous_drone_position);
         }
 
         const JPH::RVec3 inspected_position = bodies.GetPosition(drone_id);
@@ -511,6 +551,9 @@ int main(int argument_count, char **arguments) {
             if (keys[SDL_SCANCODE_SPACE]) camera.position.y += movement_speed;
             if (keys[SDL_SCANCODE_LCTRL] || keys[SDL_SCANCODE_RCTRL]) camera.position.y -= movement_speed;
         }
+        if (follow_drone) {
+            camera.LookAt(ToGlm(bodies.GetPosition(drone_id)));
+        }
 
         ControllerKeys controller_keys;
         if (active_controller == FlightController::ManualHover
@@ -537,6 +580,13 @@ int main(int argument_count, char **arguments) {
                 accumulator -= physics_step;
             }
         }
+
+        const glm::vec3 current_drone_position = ToGlm(bodies.GetPosition(drone_id));
+        if (follow_drone) {
+            camera.position += current_drone_position - previous_drone_position;
+            camera.LookAt(current_drone_position);
+        }
+        previous_drone_position = current_drone_position;
 
         int width = 0;
         int height = 0;

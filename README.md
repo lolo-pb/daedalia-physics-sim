@@ -12,7 +12,7 @@ Jolt physics -> simulated sensors -> flight controller -> motor model -> forces 
 
 ## Current state
 
-- A Jolt rigid-body simulation running at a configurable fixed timestep.
+- A Jolt rigid-body simulation running at a configurable fixed frequency.
 - An ideal IMU that reports body-frame angular velocity and specific force.
 - A controller interface that receives only the IMU sample and timestep.
 - Four normalized motor outputs driving quadcopter thrust and reaction torque.
@@ -42,12 +42,13 @@ The smoke test initializes and steps the real physics simulation without opening
 
 ## Controls
 
-- Hold the right mouse button and move the mouse to look around.
+- Hold the right mouse button and move the mouse to look around, or orbit the drone while camera follow is enabled.
 - Use `W`, `A`, `S`, and `D` to move.
 - Use `Space` to rise and `Ctrl` to descend.
 - Hold `Shift` to move faster.
+- Enable `Follow drone` in the `Physics` panel to keep the camera aimed at and moving with the drone.
 
-The `Physics` panel can pause, reset, or single-step the simulation, adjust gravity and timestep, and compare the drone's ground-truth state with the IMU values available to the controller.
+The `Physics` panel can pause, reset, or single-step the simulation, set the physics frequency from 1 to 120 Hz, adjust gravity and camera follow, and compare the drone's ground-truth state with the IMU values available to the controller. The default physics frequency is 30 Hz.
 
 ## Extending the simulator
 
