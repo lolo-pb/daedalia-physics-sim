@@ -9,8 +9,14 @@
 #include "controllers/controller_selection.hpp"
 #include "sensors/sensor_types.hpp"
 
-void InitializePhysicsRuntime();
-void ShutdownPhysicsRuntime();
+class PhysicsRuntime {
+public:
+    PhysicsRuntime();
+    ~PhysicsRuntime();
+
+    PhysicsRuntime(const PhysicsRuntime &) = delete;
+    PhysicsRuntime &operator=(const PhysicsRuntime &) = delete;
+};
 
 struct DroneInspection {
     JPH::RVec3 position;

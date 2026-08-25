@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <optional>
 
 #include <glad/gl.h>
 #include <SDL3/SDL.h>
@@ -62,34 +63,109 @@ glm::vec3 ToGlm(const JPH::RVec3 &vector) {
     return glm::vec3(vector.GetX(), vector.GetY(), vector.GetZ());
 }
 
+class ApplicationResources {
+public:
+    ~ApplicationResources() {
+        if (window_ != nullptr) {
+            SDL_SetWindowRelativeMouseMode(window_, false);
+        }
+        if (imgui_opengl_initialized_) {
+            ImGui_ImplOpenGL3_Shutdown();
+        }
+        if (imgui_sdl_initialized_) {
+            ImGui_ImplSDL3_Shutdown();
+        }
+        if (imgui_context_created_) {
+            ImGui::DestroyContext();
+        }
+        renderer_.reset();
+        if (context_ != nullptr) {
+            SDL_GL_DestroyContext(context_);
+        }
+        if (window_ != nullptr) {
+            SDL_DestroyWindow(window_);
+        }
+        if (sdl_initialized_) {
+            SDL_Quit();
+        }
+    }
+
+    bool Initialize() {
+        if (!SDL_Init(SDL_INIT_VIDEO)) {
+            std::fprintf(stderr, "SDL initialization failed: %s\n", SDL_GetError());
+            return false;
+        }
+        sdl_initialized_ = true;
+
+        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
+        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 5);
+        SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+        window_ = SDL_CreateWindow("Daedalia Physics Sim", 1280, 720, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
+        if (window_ == nullptr) {
+            std::fprintf(stderr, "Window creation failed: %s\n", SDL_GetError());
+            return false;
+        }
+
+        context_ = SDL_GL_CreateContext(window_);
+        if (context_ == nullptr || !gladLoadGL(reinterpret_cast<GLADloadfunc>(SDL_GL_GetProcAddress))) {
+            std::fprintf(stderr, "OpenGL initialization failed: %s\n", SDL_GetError());
+            return false;
+        }
+        SDL_GL_SetSwapInterval(1);
+
+        IMGUI_CHECKVERSION();
+        imgui_context_created_ = ImGui::CreateContext() != nullptr;
+        if (!imgui_context_created_) {
+            std::fprintf(stderr, "ImGui context creation failed\n");
+            return false;
+        }
+        ImGui::StyleColorsDark();
+        imgui_sdl_initialized_ = ImGui_ImplSDL3_InitForOpenGL(window_, context_);
+        if (!imgui_sdl_initialized_) {
+            std::fprintf(stderr, "ImGui SDL initialization failed\n");
+            return false;
+        }
+        imgui_opengl_initialized_ = ImGui_ImplOpenGL3_Init("#version 450");
+        if (!imgui_opengl_initialized_) {
+            std::fprintf(stderr, "ImGui OpenGL initialization failed\n");
+            return false;
+        }
+
+        renderer_.emplace();
+        if (!renderer_->Initialize()) {
+            std::fprintf(stderr, "Renderer initialization failed\n");
+            return false;
+        }
+        return true;
+    }
+
+    SDL_Window *Window() const {
+        return window_;
+    }
+
+    Renderer &GetRenderer() {
+        return *renderer_;
+    }
+
+private:
+    bool sdl_initialized_ = false;
+    bool imgui_context_created_ = false;
+    bool imgui_sdl_initialized_ = false;
+    bool imgui_opengl_initialized_ = false;
+    SDL_Window *window_ = nullptr;
+    SDL_GLContext context_ = nullptr;
+    std::optional<Renderer> renderer_;
+};
+
 } // namespace
 
 int RunInteractiveApplication(Simulation &simulation) {
-    if (!SDL_Init(SDL_INIT_VIDEO)) {
-        std::fprintf(stderr, "SDL initialization failed: %s\n", SDL_GetError());
+    ApplicationResources resources;
+    if (!resources.Initialize()) {
         return EXIT_FAILURE;
     }
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 5);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
-    SDL_Window *window = SDL_CreateWindow("Daedalia Physics Sim", 1280, 720, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
-    if (window == nullptr) {
-        std::fprintf(stderr, "Window creation failed: %s\n", SDL_GetError());
-        return EXIT_FAILURE;
-    }
-    SDL_GLContext context = SDL_GL_CreateContext(window);
-    if (context == nullptr || !gladLoadGL(reinterpret_cast<GLADloadfunc>(SDL_GL_GetProcAddress))) {
-        std::fprintf(stderr, "OpenGL initialization failed: %s\n", SDL_GetError());
-        return EXIT_FAILURE;
-    }
-    SDL_GL_SetSwapInterval(1);
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    ImGui::StyleColorsDark();
-    ImGui_ImplSDL3_InitForOpenGL(window, context);
-    ImGui_ImplOpenGL3_Init("#version 450");
-
-    Renderer renderer;
+    SDL_Window *window = resources.Window();
+    Renderer &renderer = resources.GetRenderer();
     bool running = true;
     bool looking = false;
     bool paused = false;
@@ -223,13 +299,5 @@ int RunInteractiveApplication(Simulation &simulation) {
         SDL_GL_SwapWindow(window);
     }
 
-    SDL_SetWindowRelativeMouseMode(window, false);
-    ImGui_ImplOpenGL3_Shutdown();
-    ImGui_ImplSDL3_Shutdown();
-    ImGui::DestroyContext();
-    renderer.Shutdown();
-    SDL_GL_DestroyContext(context);
-    SDL_DestroyWindow(window);
-    SDL_Quit();
     return EXIT_SUCCESS;
 }

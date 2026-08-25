@@ -9,7 +9,13 @@
 
 class Renderer {
 public:
-    Renderer();
+    Renderer() = default;
+    ~Renderer();
+
+    Renderer(const Renderer &) = delete;
+    Renderer &operator=(const Renderer &) = delete;
+
+    bool Initialize();
 
     void DrawScene(
         const DroneRenderState &drone,
@@ -17,15 +23,16 @@ public:
         const glm::vec3 &camera_forward,
         int width,
         int height) const;
-    void Shutdown();
 
 private:
     struct Mesh {
         GLuint vao = 0;
+        GLuint vertex_buffer = 0;
         GLuint vertex_count = 0;
     };
 
     static Mesh CreateMesh(const float *vertices, GLuint vertex_count);
+    static void DestroyMesh(Mesh &mesh);
     static void DrawMesh(
         const Mesh &mesh,
         GLuint program,

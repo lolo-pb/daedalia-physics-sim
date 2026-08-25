@@ -5,6 +5,7 @@
 #include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
+#include <limits>
 #include <thread>
 
 #include <Jolt/Core/Factory.h>
@@ -101,6 +102,21 @@ bool IsFiniteSensorVector(const SensorVector3 &vector) {
         && std::isfinite(vector.z);
 }
 
+constexpr int WorkerThreadCount(unsigned hardware_thread_count) {
+    if (hardware_thread_count <= 1) {
+        return 1;
+    }
+    const unsigned available_worker_threads = hardware_thread_count - 1;
+    const unsigned maximum_thread_count = static_cast<unsigned>(std::numeric_limits<int>::max());
+    return static_cast<int>(std::min(available_worker_threads, maximum_thread_count));
+}
+
+static_assert(WorkerThreadCount(0) == 1);
+static_assert(WorkerThreadCount(1) == 1);
+static_assert(WorkerThreadCount(2) == 1);
+static_assert(WorkerThreadCount(8) == 7);
+static_assert(WorkerThreadCount(std::numeric_limits<unsigned>::max()) == std::numeric_limits<int>::max());
+
 struct PhysicsWorld {
     JPH::TempAllocatorImpl temp_allocator;
     JPH::JobSystemThreadPool job_system;
@@ -114,7 +130,7 @@ struct PhysicsWorld {
         job_system(
             JPH::cMaxPhysicsJobs,
             JPH::cMaxPhysicsBarriers,
-            std::max(1u, std::thread::hardware_concurrency() - 1)) {
+            WorkerThreadCount(std::thread::hardware_concurrency())) {
         physics.Init(
             1024,
             0,
@@ -255,7 +271,7 @@ struct Simulation::Impl {
     }
 };
 
-void InitializePhysicsRuntime() {
+PhysicsRuntime::PhysicsRuntime() {
     JPH::Trace = Trace;
 #ifdef JPH_ENABLE_ASSERTS
     JPH::AssertFailed = AssertFailed;
@@ -265,7 +281,7 @@ void InitializePhysicsRuntime() {
     JPH::RegisterTypes();
 }
 
-void ShutdownPhysicsRuntime() {
+PhysicsRuntime::~PhysicsRuntime() {
     JPH::UnregisterTypes();
     delete JPH::Factory::sInstance;
     JPH::Factory::sInstance = nullptr;

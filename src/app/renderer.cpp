@@ -1,7 +1,6 @@
 #include "renderer.hpp"
 
 #include <cstdio>
-#include <cstdlib>
 
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/ext/matrix_transform.hpp>
@@ -12,6 +11,10 @@ namespace {
 
 GLuint CompileShader(GLenum type, const char *source) {
     const GLuint shader = glCreateShader(type);
+    if (shader == 0) {
+        std::fprintf(stderr, "Shader creation failed\n");
+        return 0;
+    }
     glShaderSource(shader, 1, &source, nullptr);
     glCompileShader(shader);
 
@@ -21,7 +24,8 @@ GLuint CompileShader(GLenum type, const char *source) {
         char log[1024];
         glGetShaderInfoLog(shader, sizeof(log), nullptr, log);
         std::fprintf(stderr, "Shader compilation failed: %s\n", log);
-        std::exit(EXIT_FAILURE);
+        glDeleteShader(shader);
+        return 0;
     }
     return shader;
 }
@@ -51,13 +55,36 @@ GLuint CreateProgram() {
     )";
 
     const GLuint program = glCreateProgram();
+    if (program == 0) {
+        std::fprintf(stderr, "Shader program creation failed\n");
+        return 0;
+    }
     const GLuint vertex_shader = CompileShader(GL_VERTEX_SHADER, vertex_source);
+    if (vertex_shader == 0) {
+        glDeleteProgram(program);
+        return 0;
+    }
     const GLuint fragment_shader = CompileShader(GL_FRAGMENT_SHADER, fragment_source);
+    if (fragment_shader == 0) {
+        glDeleteShader(vertex_shader);
+        glDeleteProgram(program);
+        return 0;
+    }
     glAttachShader(program, vertex_shader);
     glAttachShader(program, fragment_shader);
     glLinkProgram(program);
     glDeleteShader(vertex_shader);
     glDeleteShader(fragment_shader);
+
+    GLint linked = GL_FALSE;
+    glGetProgramiv(program, GL_LINK_STATUS, &linked);
+    if (linked == GL_FALSE) {
+        char log[1024];
+        glGetProgramInfoLog(program, sizeof(log), nullptr, log);
+        std::fprintf(stderr, "Shader program linking failed: %s\n", log);
+        glDeleteProgram(program);
+        return 0;
+    }
     return program;
 }
 
@@ -65,11 +92,17 @@ GLuint CreateProgram() {
 
 Renderer::Mesh Renderer::CreateMesh(const float *vertices, GLuint vertex_count) {
     Mesh mesh{.vertex_count = vertex_count};
-    GLuint vertex_buffer = 0;
     glCreateVertexArrays(1, &mesh.vao);
-    glCreateBuffers(1, &vertex_buffer);
-    glNamedBufferData(vertex_buffer, static_cast<GLsizeiptr>(vertex_count * 6 * sizeof(float)), vertices, GL_STATIC_DRAW);
-    glVertexArrayVertexBuffer(mesh.vao, 0, vertex_buffer, 0, 6 * sizeof(float));
+    if (mesh.vao == 0) {
+        return {};
+    }
+    glCreateBuffers(1, &mesh.vertex_buffer);
+    if (mesh.vertex_buffer == 0) {
+        DestroyMesh(mesh);
+        return {};
+    }
+    glNamedBufferData(mesh.vertex_buffer, static_cast<GLsizeiptr>(vertex_count * 6 * sizeof(float)), vertices, GL_STATIC_DRAW);
+    glVertexArrayVertexBuffer(mesh.vao, 0, mesh.vertex_buffer, 0, 6 * sizeof(float));
     glEnableVertexArrayAttrib(mesh.vao, 0);
     glEnableVertexArrayAttrib(mesh.vao, 1);
     glVertexArrayAttribFormat(mesh.vao, 0, 3, GL_FLOAT, GL_FALSE, 0);
@@ -77,6 +110,16 @@ Renderer::Mesh Renderer::CreateMesh(const float *vertices, GLuint vertex_count) 
     glVertexArrayAttribBinding(mesh.vao, 0, 0);
     glVertexArrayAttribBinding(mesh.vao, 1, 0);
     return mesh;
+}
+
+void Renderer::DestroyMesh(Mesh &mesh) {
+    if (mesh.vertex_buffer != 0) {
+        glDeleteBuffers(1, &mesh.vertex_buffer);
+    }
+    if (mesh.vao != 0) {
+        glDeleteVertexArrays(1, &mesh.vao);
+    }
+    mesh = {};
 }
 
 void Renderer::DrawMesh(
@@ -90,7 +133,15 @@ void Renderer::DrawMesh(
     glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(mesh.vertex_count));
 }
 
-Renderer::Renderer() {
+Renderer::~Renderer() {
+    DestroyMesh(cube_);
+    DestroyMesh(plane_);
+    if (program_ != 0) {
+        glDeleteProgram(program_);
+    }
+}
+
+bool Renderer::Initialize() {
     constexpr float cube_vertices[] = {
         -0.5f,-0.5f, 0.5f, 0, 0, 1,  0.5f,-0.5f, 0.5f, 0, 0, 1,  0.5f, 0.5f, 0.5f, 0, 0, 1,  -0.5f,-0.5f, 0.5f, 0, 0, 1,  0.5f, 0.5f, 0.5f, 0, 0, 1,  -0.5f, 0.5f, 0.5f, 0, 0, 1,
         -0.5f,-0.5f,-0.5f, 0, 0,-1, -0.5f, 0.5f,-0.5f, 0, 0,-1,  0.5f, 0.5f,-0.5f, 0, 0,-1, -0.5f,-0.5f,-0.5f, 0, 0,-1,  0.5f, 0.5f,-0.5f, 0, 0,-1,  0.5f,-0.5f,-0.5f, 0, 0,-1,
@@ -105,9 +156,21 @@ Renderer::Renderer() {
     };
 
     cube_ = CreateMesh(cube_vertices, 36);
+    if (cube_.vao == 0) {
+        std::fprintf(stderr, "Cube mesh creation failed\n");
+        return false;
+    }
     plane_ = CreateMesh(plane_vertices, 6);
+    if (plane_.vao == 0) {
+        std::fprintf(stderr, "Plane mesh creation failed\n");
+        return false;
+    }
     program_ = CreateProgram();
+    if (program_ == 0) {
+        return false;
+    }
     glEnable(GL_DEPTH_TEST);
+    return true;
 }
 
 void Renderer::DrawScene(
@@ -134,8 +197,4 @@ void Renderer::DrawScene(
             * glm::scale(glm::mat4(1.0f), glm::vec3(0.05f));
         DrawMesh(cube_, program_, marker, glm::vec3(0.1f, 0.8f, 0.9f));
     }
-}
-
-void Renderer::Shutdown() {
-    glDeleteProgram(program_);
 }
