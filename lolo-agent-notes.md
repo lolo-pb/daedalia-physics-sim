@@ -10,11 +10,13 @@ cmake --build build
 ./build/daedalia
 ```
 
-The app has a free-fly camera and a small ImGui physics panel for inspecting the drone and controlling the simulation. The drone layout and motor model are in `src/drone.*`; controller code lives in `src/controllers/` and writes normalized motor commands.
+The app has a free-fly camera and a small ImGui physics panel for inspecting the drone, controlling the simulation, and switching flight controllers. The drone layout and motor model are in `src/drone.*`; controller code lives in `src/controllers/` and writes normalized motor commands.
 
 ## Controller and simulation models
 
-`src/controllers/controller_io.hpp` is the shared, physics-independent controller contract. A controller receives an `ImuSample`, fixed timestep, and a simulator-owned `TargetDrone` that exposes only four normalized motor targets. `TargetDrone::SetMotorTarget` clamps each target to `0.0` through `1.0`.
+`src/controllers/controller_io.hpp` is the shared, physics-independent controller contract. A controller receives an `ImuSample`, fixed timestep, raw control keys, and a simulator-owned `TargetDrone` that exposes only four normalized motor targets. `TargetDrone::SetMotorTarget` clamps each target to `0.0` through `1.0`.
+
+The app can switch controllers at runtime with number keys or the ImGui panel. The demo controller applies constant throttle. Manual Hover interprets keyboard input as attitude, yaw, and throttle commands, then uses the attitude PID to produce motor targets.
 
 The fixed-step flow is:
 
@@ -32,6 +34,6 @@ Ground-truth position, attitude, and velocities remain available only to simulat
 
 ## Future work
 
-- Build and tune a proper PID flight controller for the quadcopter.
+- Tune and validate the attitude PID against the simulated quadcopter.
 - Once the quadcopter is stable, try a weird multirotor layout or a helicopter.
 - More drone layouts, physics visualisation, saved scenarios, and experimental force models.
