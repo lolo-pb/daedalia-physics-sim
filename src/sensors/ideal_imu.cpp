@@ -2,7 +2,7 @@
 
 namespace {
 
-ImuVector3 ToImuVector(const JPH::Vec3 &vector) {
+SensorVector3 ToSensorVector(const JPH::Vec3 &vector) {
     return {vector.GetX(), vector.GetY(), vector.GetZ()};
 }
 
@@ -33,7 +33,7 @@ ImuSample IdealImuModel::Sample(
     const JPH::Quat world_to_body = body_rotation.Conjugated();
     return {
         timestamp_seconds,
-        ToImuVector(world_to_body * world_angular_velocity),
-        ToImuVector(world_to_body * (world_acceleration - world_gravity)),
+        ToSensorVector(world_to_body * world_angular_velocity),
+        ToSensorVector(world_to_body * (world_acceleration - world_gravity)),
     };
 }

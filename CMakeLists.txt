@@ -73,12 +73,18 @@ add_library(controller STATIC
     src/controllers/demo_controller.cpp
     src/controllers/manual_controller.cpp
 )
-target_include_directories(controller PUBLIC src)
+target_include_directories(controller PUBLIC
+    src/controllers/include
+    src/sensors/include
+)
 
 add_executable(daedalia
     src/main.cpp
     src/drone.cpp
+    src/sensors/ideal_barometer.cpp
+    src/sensors/ideal_gps.cpp
     src/sensors/ideal_imu.cpp
+    src/sensors/ideal_magnetometer.cpp
 )
 target_link_libraries(daedalia PRIVATE controller SDL3::SDL3 Jolt glm::glm glad imgui OpenGL::GL)
 

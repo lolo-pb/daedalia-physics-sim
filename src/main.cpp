@@ -35,7 +35,10 @@
 #include "controllers/demo_controller.hpp"
 #include "controllers/manual_controller.hpp"
 #include "drone.hpp"
+#include "sensors/ideal_barometer.hpp"
+#include "sensors/ideal_gps.hpp"
 #include "sensors/ideal_imu.hpp"
+#include "sensors/ideal_magnetometer.hpp"
 
 namespace {
 
@@ -221,7 +224,7 @@ bool IsFiniteQuaternion(const JPH::Quat &rotation) {
     return IsFiniteVector(rotation) && std::isfinite(rotation.GetW());
 }
 
-bool IsFiniteImuVector(const ImuVector3 &vector) {
+bool IsFiniteSensorVector(const SensorVector3 &vector) {
     return std::isfinite(vector.x)
         && std::isfinite(vector.y)
         && std::isfinite(vector.z);
@@ -279,6 +282,9 @@ int main(int argument_count, char **arguments) {
     Drone drone(bodies);
     const JPH::BodyID drone_id = drone.GetBodyID();
     IdealImuModel imu_model;
+    IdealGpsModel gps_model;
+    IdealBarometerModel barometer_model;
+    IdealMagnetometerModel magnetometer_model;
     imu_model.Reset(bodies.GetLinearVelocity(drone_id));
     double simulation_time = 0.0;
     ImuSample latest_imu_sample = imu_model.Sample(
@@ -288,6 +294,16 @@ int main(int argument_count, char **arguments) {
         bodies.GetAngularVelocity(drone_id),
         bodies.GetLinearVelocity(drone_id),
         physics.GetGravity());
+    GpsSample latest_gps_sample = gps_model.Sample(
+        simulation_time,
+        bodies.GetPosition(drone_id),
+        bodies.GetLinearVelocity(drone_id));
+    BarometerSample latest_barometer_sample = barometer_model.Sample(
+        simulation_time,
+        static_cast<float>(bodies.GetPosition(drone_id).GetY()));
+    MagnetometerSample latest_magnetometer_sample = magnetometer_model.Sample(
+        simulation_time,
+        bodies.GetRotation(drone_id));
     TargetDrone target_drone;
     ManualController manual_controller;
     FlightController active_controller = FlightController::Demo;
@@ -307,6 +323,16 @@ int main(int argument_count, char **arguments) {
             bodies.GetAngularVelocity(drone_id),
             bodies.GetLinearVelocity(drone_id),
             physics.GetGravity());
+        latest_gps_sample = gps_model.Sample(
+            simulation_time,
+            bodies.GetPosition(drone_id),
+            bodies.GetLinearVelocity(drone_id));
+        latest_barometer_sample = barometer_model.Sample(
+            simulation_time,
+            static_cast<float>(bodies.GetPosition(drone_id).GetY()));
+        latest_magnetometer_sample = magnetometer_model.Sample(
+            simulation_time,
+            bodies.GetRotation(drone_id));
         const ControllerInput controller_input{
             latest_imu_sample,
             static_cast<float>(physics_step),
@@ -325,18 +351,60 @@ int main(int argument_count, char **arguments) {
     };
 
     if (run_smoke_test) {
+        const bool initial_sensor_state_is_valid =
+            std::fabs(latest_gps_sample.world_position_meters.x) < 1.0e-6f
+            && std::fabs(latest_gps_sample.world_position_meters.y - 1.0f) < 1.0e-6f
+            && std::fabs(latest_gps_sample.world_position_meters.z) < 1.0e-6f
+            && std::fabs(latest_gps_sample.world_velocity_meters_per_second.x) < 1.0e-6f
+            && std::fabs(latest_gps_sample.world_velocity_meters_per_second.y) < 1.0e-6f
+            && std::fabs(latest_gps_sample.world_velocity_meters_per_second.z) < 1.0e-6f
+            && std::fabs(BarometricAltitudeMeters(latest_barometer_sample.pressure_pascals) - 1.0f) < 1.0e-3f
+            && std::fabs(latest_magnetometer_sample.body_magnetic_field_microteslas.x) < 1.0e-6f
+            && std::fabs(latest_magnetometer_sample.body_magnetic_field_microteslas.y) < 1.0e-6f
+            && std::fabs(latest_magnetometer_sample.body_magnetic_field_microteslas.z + 50.0f) < 1.0e-6f;
+
         for (int step = 0; step < physics_frequency_hz; ++step) {
             update_physics(ControllerKeys{});
         }
 
+        const GpsSample checked_gps_sample = gps_model.Sample(
+            simulation_time,
+            bodies.GetPosition(drone_id),
+            bodies.GetLinearVelocity(drone_id));
+        const JPH::RVec3 checked_position = bodies.GetPosition(drone_id);
+        const JPH::Vec3 checked_velocity = bodies.GetLinearVelocity(drone_id);
+
         const bool state_is_valid =
-            bodies.IsAdded(drone_id)
+            initial_sensor_state_is_valid
+            && bodies.IsAdded(drone_id)
             && IsFiniteVector(bodies.GetPosition(drone_id))
             && IsFiniteQuaternion(bodies.GetRotation(drone_id))
             && IsFiniteVector(bodies.GetLinearVelocity(drone_id))
             && IsFiniteVector(bodies.GetAngularVelocity(drone_id))
-            && IsFiniteImuVector(latest_imu_sample.body_gyro_rad_per_second)
-            && IsFiniteImuVector(latest_imu_sample.body_specific_force_meters_per_second_squared)
+            && IsFiniteSensorVector(latest_imu_sample.body_gyro_rad_per_second)
+            && IsFiniteSensorVector(latest_imu_sample.body_specific_force_meters_per_second_squared)
+            && IsFiniteSensorVector(latest_gps_sample.world_position_meters)
+            && IsFiniteSensorVector(latest_gps_sample.world_velocity_meters_per_second)
+            && std::isfinite(latest_barometer_sample.pressure_pascals)
+            && latest_barometer_sample.pressure_pascals > 0.0f
+            && std::fabs(
+                BarometricAltitudeMeters(latest_barometer_sample.pressure_pascals)
+                - latest_gps_sample.world_position_meters.y) < 1.0e-3f
+            && IsFiniteSensorVector(latest_magnetometer_sample.body_magnetic_field_microteslas)
+            && std::fabs(
+                latest_magnetometer_sample.body_magnetic_field_microteslas.x
+                    * latest_magnetometer_sample.body_magnetic_field_microteslas.x
+                + latest_magnetometer_sample.body_magnetic_field_microteslas.y
+                    * latest_magnetometer_sample.body_magnetic_field_microteslas.y
+                + latest_magnetometer_sample.body_magnetic_field_microteslas.z
+                    * latest_magnetometer_sample.body_magnetic_field_microteslas.z
+                - 2500.0f) < 1.0e-2f
+            && std::fabs(checked_gps_sample.world_position_meters.x - checked_position.GetX()) < 1.0e-6f
+            && std::fabs(checked_gps_sample.world_position_meters.y - checked_position.GetY()) < 1.0e-6f
+            && std::fabs(checked_gps_sample.world_position_meters.z - checked_position.GetZ()) < 1.0e-6f
+            && std::fabs(checked_gps_sample.world_velocity_meters_per_second.x - checked_velocity.GetX()) < 1.0e-6f
+            && std::fabs(checked_gps_sample.world_velocity_meters_per_second.y - checked_velocity.GetY()) < 1.0e-6f
+            && std::fabs(checked_gps_sample.world_velocity_meters_per_second.z - checked_velocity.GetZ()) < 1.0e-6f
             && simulation_time > 0.99
             && target_drone.GetMotorTarget(MotorId::FrontLeft) == 0.8f
             && target_drone.GetMotorTarget(MotorId::FrontRight) == 0.8f
@@ -487,6 +555,16 @@ int main(int argument_count, char **arguments) {
                 bodies.GetAngularVelocity(drone_id),
                 bodies.GetLinearVelocity(drone_id),
                 physics.GetGravity());
+            latest_gps_sample = gps_model.Sample(
+                simulation_time,
+                bodies.GetPosition(drone_id),
+                bodies.GetLinearVelocity(drone_id));
+            latest_barometer_sample = barometer_model.Sample(
+                simulation_time,
+                static_cast<float>(bodies.GetPosition(drone_id).GetY()));
+            latest_magnetometer_sample = magnetometer_model.Sample(
+                simulation_time,
+                bodies.GetRotation(drone_id));
             manual_controller.Reset();
             accumulator = 0.0;
         }
@@ -522,7 +600,10 @@ int main(int argument_count, char **arguments) {
         ImGui::Text("Linear velocity: %.3f, %.3f, %.3f", linear_velocity.GetX(), linear_velocity.GetY(), linear_velocity.GetZ());
         ImGui::Text("Angular velocity: %.3f, %.3f, %.3f", angular_velocity.GetX(), angular_velocity.GetY(), angular_velocity.GetZ());
         ImGui::Text("Mass: %.3f", mass);
-        ImGui::SeparatorText("Controller IMU");
+        ImGui::End();
+
+        ImGui::Begin("Sensors");
+        ImGui::SeparatorText("IMU");
         ImGui::Text("Timestamp: %.3f s", latest_imu_sample.timestamp_seconds);
         ImGui::Text(
             "Gyro (body, rad/s): %.3f, %.3f, %.3f",
@@ -534,6 +615,28 @@ int main(int argument_count, char **arguments) {
             latest_imu_sample.body_specific_force_meters_per_second_squared.x,
             latest_imu_sample.body_specific_force_meters_per_second_squared.y,
             latest_imu_sample.body_specific_force_meters_per_second_squared.z);
+        ImGui::SeparatorText("GPS");
+        ImGui::Text(
+            "Position (world, m): %.3f, %.3f, %.3f",
+            latest_gps_sample.world_position_meters.x,
+            latest_gps_sample.world_position_meters.y,
+            latest_gps_sample.world_position_meters.z);
+        ImGui::Text(
+            "Velocity (world, m/s): %.3f, %.3f, %.3f",
+            latest_gps_sample.world_velocity_meters_per_second.x,
+            latest_gps_sample.world_velocity_meters_per_second.y,
+            latest_gps_sample.world_velocity_meters_per_second.z);
+        ImGui::SeparatorText("Barometer");
+        ImGui::Text("Pressure: %.2f Pa", latest_barometer_sample.pressure_pascals);
+        ImGui::Text(
+            "Altitude: %.3f m",
+            BarometricAltitudeMeters(latest_barometer_sample.pressure_pascals));
+        ImGui::SeparatorText("Magnetometer");
+        ImGui::Text(
+            "Magnetic field (body, uT): %.3f, %.3f, %.3f",
+            latest_magnetometer_sample.body_magnetic_field_microteslas.x,
+            latest_magnetometer_sample.body_magnetic_field_microteslas.y,
+            latest_magnetometer_sample.body_magnetic_field_microteslas.z);
         ImGui::End();
 
         const bool *keys = SDL_GetKeyboardState(nullptr);

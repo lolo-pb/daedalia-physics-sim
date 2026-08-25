@@ -4,6 +4,8 @@
 #include <array>
 #include <cstddef>
 
+#include "sensors/sensor_types.hpp"
+
 enum class MotorId {
     FrontLeft,
     FrontRight,
@@ -23,18 +25,6 @@ public:
 
 private:
     std::array<float, 4> targets_{};
-};
-
-struct ImuVector3 {
-    float x = 0.0f;
-    float y = 0.0f;
-    float z = 0.0f;
-};
-
-struct ImuSample {
-    double timestamp_seconds = 0.0;
-    ImuVector3 body_gyro_rad_per_second;
-    ImuVector3 body_specific_force_meters_per_second_squared;
 };
 
 struct ControllerKeys {

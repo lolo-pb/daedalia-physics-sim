@@ -13,7 +13,7 @@ Jolt physics -> simulated sensors -> flight controller -> motor model -> forces 
 ## Current state
 
 - A Jolt rigid-body simulation running at a configurable fixed frequency.
-- An ideal IMU that reports body-frame angular velocity and specific force.
+- Ideal IMU, local GPS, barometer, and magnetometer models.
 - A controller interface that receives only the IMU sample and timestep.
 - Four normalized motor outputs driving quadcopter thrust and reaction torque.
 - An OpenGL view and ImGui panel for inspecting ground truth, sensor output, and simulation state.
@@ -48,11 +48,13 @@ The smoke test initializes and steps the real physics simulation without opening
 - Hold `Shift` to move faster.
 - Enable `Follow drone` in the `Physics` panel to keep the camera aimed at and moving with the drone.
 
-The `Physics` panel can pause, reset, or single-step the simulation, set the physics frequency from 1 to 120 Hz, adjust gravity and camera follow, and compare the drone's ground-truth state with the IMU values available to the controller. The default physics frequency is 30 Hz.
+The `Physics` panel can pause, reset, or single-step the simulation, set the physics frequency from 1 to 120 Hz, adjust gravity and camera follow, and inspect the drone's ground-truth state. The default physics frequency is 30 Hz.
+
+The `Sensors` panel shows the latest ideal IMU, GPS, barometer, and magnetometer samples. GPS uses the simulator's local world coordinates, the barometer treats world `Y = 0` as sea level, and magnetic north points along world `-Z`.
 
 ## Extending the simulator
 
-- Sensor behavior lives in `src/sensors/`.
+- Sensor behavior and physics-independent sample types live in `src/sensors/`.
 - Flight controllers and their physics-independent input/output contract live in `src/controllers/`.
 - Vehicle geometry, motors, and force application live in `src/drone.*`.
 - `src/main.cpp` owns the fixed-step simulation loop, rendering, and debug UI.

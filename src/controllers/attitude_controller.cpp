@@ -75,7 +75,7 @@ void AttitudeController::Update(const ControllerInput &input,
     return;
   }
 
-  const ImuVector3 &gyro = input.imu.body_gyro_rad_per_second;
+  const SensorVector3 &gyro = input.imu.body_gyro_rad_per_second;
   UpdateAttitudeEstimate(input.imu, timestep);
 
   const float pitch_correction =
@@ -94,8 +94,8 @@ void AttitudeController::Update(const ControllerInput &input,
 
 void AttitudeController::UpdateAttitudeEstimate(const ImuSample &imu,
                                                  float timestep) {
-  const ImuVector3 &gyro = imu.body_gyro_rad_per_second;
-  const ImuVector3 &acceleration =
+  const SensorVector3 &gyro = imu.body_gyro_rad_per_second;
+  const SensorVector3 &acceleration =
       imu.body_specific_force_meters_per_second_squared;
   const float acceleration_squared = acceleration.x * acceleration.x +
                                      acceleration.y * acceleration.y +

@@ -45,3 +45,5 @@ Ground-truth position, attitude, and velocities remain available only to simulat
 - Tune and validate the attitude PID against the simulated quadcopter.
 - Once the quadcopter is stable, try a weird multirotor layout or a helicopter.
 - More drone layouts, physics visualisation, saved scenarios, and experimental force models.
+
+- Make separate menus in ui for physics real stuff and sensor data
