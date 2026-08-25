@@ -30,7 +30,9 @@
 #include <Jolt/Physics/PhysicsSystem.h>
 #include <Jolt/RegisterTypes.h>
 
+#include "controllers/controller_selection.hpp"
 #include "controllers/demo_controller.hpp"
+#include "controllers/manual_controller.hpp"
 #include "drone.hpp"
 #include "sensors/ideal_imu.hpp"
 
@@ -239,6 +241,16 @@ int main() {
         bodies.GetLinearVelocity(drone_id),
         physics.GetGravity());
     TargetDrone target_drone;
+    ManualController manual_controller;
+    FlightController active_controller = FlightController::Demo;
+    const auto select_controller = [&](int slot) {
+        const FlightController previous_controller = active_controller;
+        if (SelectControllerSlot(slot, active_controller)
+            && active_controller != previous_controller
+            && active_controller == FlightController::ManualHover) {
+            manual_controller.Reset();
+        }
+    };
 
     if (!SDL_Init(SDL_INIT_VIDEO)) {
         std::fprintf(stderr, "SDL initialization failed: %s\n", SDL_GetError());
@@ -295,7 +307,22 @@ int main() {
             if (event.type == SDL_EVENT_QUIT) {
                 running = false;
             }
-            if (!ImGui::GetIO().WantCaptureMouse && event.type == SDL_EVENT_MOUSE_BUTTON_DOWN && event.button.button == SDL_BUTTON_RIGHT) {
+            if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat) {
+                switch (event.key.scancode) {
+                case SDL_SCANCODE_1: select_controller(1); break;
+                case SDL_SCANCODE_2: select_controller(2); break;
+                case SDL_SCANCODE_3: select_controller(3); break;
+                case SDL_SCANCODE_4: select_controller(4); break;
+                case SDL_SCANCODE_5: select_controller(5); break;
+                case SDL_SCANCODE_6: select_controller(6); break;
+                case SDL_SCANCODE_7: select_controller(7); break;
+                case SDL_SCANCODE_8: select_controller(8); break;
+                case SDL_SCANCODE_9: select_controller(9); break;
+                case SDL_SCANCODE_0: select_controller(0); break;
+                default: break;
+                }
+            }
+            if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN && event.button.button == SDL_BUTTON_RIGHT) {
                 looking = true;
                 SDL_SetWindowRelativeMouseMode(window, true);
             }
@@ -317,6 +344,21 @@ int main() {
         ImGui::NewFrame();
 
         ImGui::Begin("Physics");
+        ImGui::SeparatorText("Flight controller");
+        if (ImGui::RadioButton("1 Demo", active_controller == FlightController::Demo)) {
+            select_controller(1);
+        }
+        ImGui::SameLine();
+        if (ImGui::RadioButton("2 Manual Hover", active_controller == FlightController::ManualHover)) {
+            select_controller(2);
+        }
+        if (active_controller == FlightController::ManualHover) {
+            ImGui::Text("Throttle: %.3f", manual_controller.GetThrottle());
+            ImGui::TextUnformatted("W/S pitch, A/D roll, Q/E yaw, R/F throttle");
+            ImGui::TextUnformatted("Hold right mouse for camera controls");
+        }
+
+        ImGui::SeparatorText("Simulation");
         if (ImGui::Button(paused ? "Resume" : "Pause")) {
             paused = !paused;
         }
@@ -337,6 +379,7 @@ int main() {
                 bodies.GetAngularVelocity(drone_id),
                 bodies.GetLinearVelocity(drone_id),
                 physics.GetGravity());
+            manual_controller.Reset();
             accumulator = 0.0;
         }
         if (ImGui::DragFloat3("Gravity", gravity, 0.1f)) {
@@ -385,13 +428,29 @@ int main() {
         const glm::vec3 forward = camera.Forward();
         const glm::vec3 horizontal_forward = glm::normalize(glm::vec3(forward.x, 0.0f, forward.z));
         const glm::vec3 right = glm::normalize(glm::cross(horizontal_forward, glm::vec3(0.0f, 1.0f, 0.0f)));
-        if (!ImGui::GetIO().WantCaptureKeyboard) {
+        const bool camera_accepts_keyboard = looking
+            || (active_controller == FlightController::Demo && !ImGui::GetIO().WantCaptureKeyboard);
+        if (camera_accepts_keyboard) {
             if (keys[SDL_SCANCODE_W]) camera.position += horizontal_forward * movement_speed;
             if (keys[SDL_SCANCODE_S]) camera.position -= horizontal_forward * movement_speed;
             if (keys[SDL_SCANCODE_D]) camera.position += right * movement_speed;
             if (keys[SDL_SCANCODE_A]) camera.position -= right * movement_speed;
             if (keys[SDL_SCANCODE_SPACE]) camera.position.y += movement_speed;
             if (keys[SDL_SCANCODE_LCTRL] || keys[SDL_SCANCODE_RCTRL]) camera.position.y -= movement_speed;
+        }
+
+        ControllerKeys controller_keys;
+        if (active_controller == FlightController::ManualHover
+            && !looking
+            && !ImGui::GetIO().WantCaptureKeyboard) {
+            controller_keys.w = keys[SDL_SCANCODE_W];
+            controller_keys.a = keys[SDL_SCANCODE_A];
+            controller_keys.s = keys[SDL_SCANCODE_S];
+            controller_keys.d = keys[SDL_SCANCODE_D];
+            controller_keys.q = keys[SDL_SCANCODE_Q];
+            controller_keys.e = keys[SDL_SCANCODE_E];
+            controller_keys.r = keys[SDL_SCANCODE_R];
+            controller_keys.f = keys[SDL_SCANCODE_F];
         }
 
         const auto update_physics = [&] {
@@ -405,8 +464,13 @@ int main() {
             const ControllerInput controller_input{
                 latest_imu_sample,
                 static_cast<float>(physics_step),
+                controller_keys,
             };
-            UpdateDemoController(controller_input, target_drone);
+            if (active_controller == FlightController::Demo) {
+                UpdateDemoController(controller_input, target_drone);
+            } else {
+                manual_controller.Update(controller_input, target_drone);
+            }
             drone.SetMotorTargets(target_drone);
             drone.UpdateMotors();
             drone.ApplyForces(bodies);

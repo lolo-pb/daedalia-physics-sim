@@ -68,7 +68,11 @@ target_link_libraries(imgui PRIVATE SDL3::SDL3 glad OpenGL::GL)
 
 find_package(OpenGL REQUIRED)
 
-add_library(controller STATIC src/controllers/demo_controller.cpp)
+add_library(controller STATIC
+    src/controllers/attitude_controller.cpp
+    src/controllers/demo_controller.cpp
+    src/controllers/manual_controller.cpp
+)
 target_include_directories(controller PUBLIC src)
 
 add_executable(daedalia

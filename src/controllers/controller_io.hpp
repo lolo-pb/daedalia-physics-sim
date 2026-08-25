@@ -37,7 +37,19 @@ struct ImuSample {
     ImuVector3 body_specific_force_meters_per_second_squared;
 };
 
+struct ControllerKeys {
+    bool w = false;
+    bool a = false;
+    bool s = false;
+    bool d = false;
+    bool q = false;
+    bool e = false;
+    bool r = false;
+    bool f = false;
+};
+
 struct ControllerInput {
     ImuSample imu;
     float timestep_seconds = 0.0f;
+    ControllerKeys keys;
 };
