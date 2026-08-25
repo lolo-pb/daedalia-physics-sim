@@ -40,6 +40,9 @@ struct ControllerKeys {
 
 struct ControllerInput {
     ImuSample imu;
+    GpsSample gps;
+    BarometerSample barometer;
+    MagnetometerSample magnetometer;
     float timestep_seconds = 0.0f;
     ControllerKeys keys;
 };

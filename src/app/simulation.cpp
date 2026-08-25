@@ -22,6 +22,7 @@
 
 #include "controllers/demo_controller.hpp"
 #include "controllers/manual_controller.hpp"
+#include "controllers/position_hold_controller.hpp"
 #include "drone.hpp"
 #include "sensors/ideal_barometer.hpp"
 #include "sensors/ideal_gps.hpp"
@@ -163,6 +164,7 @@ struct Simulation::Impl {
     IdealMagnetometerModel magnetometer_model;
     TargetDrone target_drone;
     ManualController manual_controller;
+    PositionHoldController position_hold_controller;
     FlightController active_controller = FlightController::Demo;
     std::array<float, 3> gravity{0.0f, -9.81f, 0.0f};
     int physics_frequency_hz = 30;
@@ -293,10 +295,14 @@ Simulation::~Simulation() = default;
 
 void Simulation::SelectController(int slot) {
     const FlightController previous_controller = impl_->active_controller;
-    if (SelectControllerSlot(slot, impl_->active_controller)
-        && impl_->active_controller != previous_controller
-        && impl_->active_controller == FlightController::ManualHover) {
+    if (!SelectControllerSlot(slot, impl_->active_controller)
+        || impl_->active_controller == previous_controller) {
+        return;
+    }
+    if (impl_->active_controller == FlightController::ManualHover) {
         impl_->manual_controller.Reset();
+    } else if (impl_->active_controller == FlightController::PositionHold) {
+        impl_->position_hold_controller.Reset();
     }
 }
 
@@ -304,13 +310,19 @@ void Simulation::Step(const ControllerKeys &controller_keys) {
     impl_->SampleSensors();
     const ControllerInput controller_input{
         impl_->latest_imu_sample,
+        impl_->latest_gps_sample,
+        impl_->latest_barometer_sample,
+        impl_->latest_magnetometer_sample,
         static_cast<float>(impl_->physics_step),
         controller_keys,
     };
     if (impl_->active_controller == FlightController::Demo) {
         UpdateDemoController(controller_input, impl_->target_drone);
-    } else {
+    } else if (impl_->active_controller == FlightController::ManualHover) {
         impl_->manual_controller.Update(controller_input, impl_->target_drone);
+    } else {
+        impl_->position_hold_controller.Update(
+            controller_input, impl_->target_drone);
     }
     impl_->drone.SetMotorTargets(impl_->target_drone);
     impl_->drone.UpdateMotors();
@@ -329,6 +341,7 @@ void Simulation::Reset() {
     impl_->simulation_time = 0.0;
     impl_->SampleSensors();
     impl_->manual_controller.Reset();
+    impl_->position_hold_controller.Reset();
 }
 
 int Simulation::RunSmokeTest() {
@@ -337,12 +350,82 @@ int Simulation::RunSmokeTest() {
         Step(ControllerKeys{});
     }
 
-    const bool state_is_valid = initial_sensor_state_is_valid
+    const bool demo_state_is_valid = initial_sensor_state_is_valid
         && impl_->HasFiniteSimulationState()
         && impl_->HasConsistentSensorState()
         && impl_->HasExpectedDemoControllerState();
-    if (!state_is_valid) {
+    if (!demo_state_is_valid) {
         std::fprintf(stderr, "Simulation smoke test failed\n");
+        return EXIT_FAILURE;
+    }
+
+    Reset();
+    SelectController(3);
+    const bool position_hold_selected =
+        GetActiveController() == FlightController::PositionHold;
+    SelectController(9);
+    const bool invalid_slot_was_ignored =
+        GetActiveController() == FlightController::PositionHold;
+    for (int step = 0; step < impl_->physics_frequency_hz * 5; ++step) {
+        Step(ControllerKeys{});
+    }
+    const DroneInspection stationary_hold = InspectDrone();
+    const bool stationary_hold_is_stable =
+        std::fabs(stationary_hold.position.GetX()) < 0.1
+        && std::fabs(stationary_hold.position.GetY() - 1.0) < 0.15
+        && std::fabs(stationary_hold.position.GetZ()) < 0.1
+        && stationary_hold.linear_velocity.Length() < 0.2f;
+
+    ControllerKeys move_target;
+    move_target.w = true;
+    move_target.r = true;
+    for (int step = 0; step < impl_->physics_frequency_hz * 2; ++step) {
+        Step(move_target);
+    }
+    for (int step = 0; step < impl_->physics_frequency_hz * 8; ++step) {
+        Step(ControllerKeys{});
+    }
+    const DroneInspection moved_hold = InspectDrone();
+    const bool moved_target_is_held =
+        std::fabs(moved_hold.position.GetX()) < 0.35
+        && std::fabs(moved_hold.position.GetY() - 2.0) < 0.35
+        && std::fabs(moved_hold.position.GetZ() + 2.0) < 0.35
+        && moved_hold.linear_velocity.Length() < 0.5f;
+
+    Reset();
+    for (int step = 0; step < impl_->physics_frequency_hz * 3; ++step) {
+        Step(ControllerKeys{});
+    }
+    const DroneInspection reset_hold = InspectDrone();
+    const bool reset_target_was_captured =
+        std::fabs(reset_hold.position.GetX()) < 0.1
+        && std::fabs(reset_hold.position.GetY() - 1.0) < 0.15
+        && std::fabs(reset_hold.position.GetZ()) < 0.1
+        && reset_hold.linear_velocity.Length() < 0.2f;
+
+    const bool state_is_valid = position_hold_selected
+        && invalid_slot_was_ignored
+        && stationary_hold_is_stable
+        && moved_target_is_held
+        && reset_target_was_captured
+        && impl_->HasFiniteSimulationState()
+        && impl_->HasConsistentSensorState();
+    if (!state_is_valid) {
+        std::fprintf(
+            stderr,
+            "Position hold smoke test failed: stationary=(%.3f, %.3f, %.3f), "
+            "moved=(%.3f, %.3f, %.3f), velocity=%.3f, "
+            "reset=(%.3f, %.3f, %.3f)\n",
+            stationary_hold.position.GetX(),
+            stationary_hold.position.GetY(),
+            stationary_hold.position.GetZ(),
+            moved_hold.position.GetX(),
+            moved_hold.position.GetY(),
+            moved_hold.position.GetZ(),
+            moved_hold.linear_velocity.Length(),
+            reset_hold.position.GetX(),
+            reset_hold.position.GetY(),
+            reset_hold.position.GetZ());
         return EXIT_FAILURE;
     }
     std::printf("Simulation smoke test passed\n");

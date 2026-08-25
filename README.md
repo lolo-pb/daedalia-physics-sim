@@ -14,11 +14,11 @@ Jolt physics -> simulated sensors -> flight controller -> motor model -> forces 
 
 - A Jolt rigid-body simulation running at a configurable fixed frequency.
 - Ideal IMU, local GPS, barometer, and magnetometer models.
-- A controller interface that receives only the IMU sample and timestep.
+- A controller interface that receives ideal IMU, GPS, barometer, and magnetometer samples.
 - Four normalized motor outputs driving quadcopter thrust and reaction torque.
 - An OpenGL view and ImGui panel for inspecting ground truth, sensor output, and simulation state.
 
-The included demo controller currently applies constant throttle. It is a simple integration check, not a stable flight controller.
+The included controllers provide a constant-throttle demo, manual attitude control, and movable position hold.
 
 ## Build and run
 
@@ -47,6 +47,7 @@ The smoke test initializes and steps the real physics simulation without opening
 - Use `Space` to rise and `Ctrl` to descend.
 - Hold `Shift` to move faster.
 - Enable `Follow drone` in the `Physics` panel to keep the camera aimed at and moving with the drone.
+- Select controller slot `3` for Position Hold. `W`/`S` move the held target forward/backward, `A`/`D` move it sideways, `Q`/`E` change heading, and `R`/`F` change altitude.
 
 The `Physics` panel can pause, reset, or single-step the simulation, set the physics frequency from 1 to 120 Hz, adjust gravity and camera follow, and inspect the drone's ground-truth state. The default physics frequency is 30 Hz.
 
@@ -59,4 +60,4 @@ The `Sensors` panel shows the latest ideal IMU, GPS, barometer, and magnetometer
 - Vehicle geometry, motors, and force application live in `src/drone.*`.
 - `src/app/` owns the fixed-step simulation, application loop, rendering, and debug UI; `src/main.cpp` is the launcher.
 
-Near-term work is to replace the constant-throttle demo with a tuned closed-loop controller, then add realistic sensor imperfections and experiment with different aircraft layouts.
+The position-hold controller is a standalone closed loop that uses only simulated sensor samples; ground truth remains limited to the simulation and debug UI.

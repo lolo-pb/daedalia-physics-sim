@@ -23,9 +23,18 @@ PhysicsPanelResult DrawPhysicsPanel(
     if (ImGui::RadioButton("2 Manual Hover", simulation.GetActiveController() == FlightController::ManualHover)) {
         simulation.SelectController(2);
     }
+    ImGui::SameLine();
+    if (ImGui::RadioButton("3 Position Hold", simulation.GetActiveController() == FlightController::PositionHold)) {
+        simulation.SelectController(3);
+    }
     if (simulation.GetActiveController() == FlightController::ManualHover) {
         ImGui::Text("Throttle: %.3f", simulation.GetManualControllerThrottle());
         ImGui::TextUnformatted("W/S pitch, A/D roll, Q/E yaw, R/F throttle");
+        ImGui::TextUnformatted("Hold right mouse for camera controls");
+    }
+    if (simulation.GetActiveController() == FlightController::PositionHold) {
+        ImGui::TextUnformatted("W/S forward, A/D right, Q/E yaw, R/F altitude");
+        ImGui::TextUnformatted("Commands move the held target relative to its heading");
         ImGui::TextUnformatted("Hold right mouse for camera controls");
     }
 

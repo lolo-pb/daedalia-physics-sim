@@ -3,6 +3,7 @@
 enum class FlightController {
     Demo,
     ManualHover,
+    PositionHold,
 };
 
 inline bool SelectControllerSlot(int slot, FlightController &active_controller) {
@@ -12,6 +13,9 @@ inline bool SelectControllerSlot(int slot, FlightController &active_controller) 
         return true;
     case 2:
         active_controller = FlightController::ManualHover;
+        return true;
+    case 3:
+        active_controller = FlightController::PositionHold;
         return true;
     default:
         return false;
