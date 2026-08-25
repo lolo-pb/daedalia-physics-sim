@@ -40,6 +40,72 @@ Motor order is `FrontLeft`, `FrontRight`, `RearRight`, `RearLeft`. Local `+X` is
 
 Ground-truth position, attitude, and velocities remain available only to simulation and the debug UI. The UI also shows the latest controller-facing IMU sample.
 
+## Flow
+
+Startup :
+
+  main
+   ├─ initialize Jolt runtime
+   ├─ construct Simulation
+   │   ├─ create physics world and floor
+   │   ├─ create drone
+   │   ├─ create sensors/controllers
+   │   └─ take initial sensor samples
+   └─ run interactive application
+        ├─ initialize SDL, OpenGL, and ImGui
+        ├─ create Renderer
+        └─ repeat every frame
+             1. process events
+             2. draw/update UI controls
+             3. read keyboard input
+             4. advance fixed physics steps
+             5. update camera follow
+             6. render scene and ImGui
+             7. swap window buffers
+
+
+Working loop :
+
+One call to Simulation::Step() performs:
+
+     sample sensors
+         ↓
+     run selected controller
+         ↓
+     set motor targets
+         ↓
+     update motor speeds
+         ↓
+     apply forces and torques
+         ↓
+     advance Jolt physics
+         ↓
+     advance simulation time
+
+     This is implemented at src/app/simulation.cpp:287.
+
+## File responsibilities
+
+   File                Responsibility
+  ━━━━━━━━━━━━━━━━━━  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   src/main.cpp        Program mode selection and Jolt runtime
+                       lifecycle
+  ──────────────────  ────────────────────────────────────────────
+   src/app/            Window, events, camera, timing, input, and
+   application.cpp     frame loop
+  ──────────────────  ────────────────────────────────────────────
+   src/app/            Public interface between the app and
+   simulation.hpp      simulation
+  ──────────────────  ────────────────────────────────────────────
+   src/app/            Jolt world, drone, sensors, controllers,
+   simulation.cpp      stepping, reset, and smoke validation
+  ──────────────────  ────────────────────────────────────────────
+   src/app/ui.cpp      ImGui panels and UI-to-simulation actions
+  ──────────────────  ────────────────────────────────────────────
+   src/app/            Shaders, meshes, OpenGL drawing, and scene
+   renderer.cpp        transforms
+
+
 ## Future work
 
 - Tune and validate the attitude PID against the simulated quadcopter.

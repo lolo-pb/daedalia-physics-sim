@@ -79,6 +79,10 @@ target_include_directories(controller PUBLIC
 )
 
 add_executable(daedalia
+    src/app/application.cpp
+    src/app/renderer.cpp
+    src/app/simulation.cpp
+    src/app/ui.cpp
     src/main.cpp
     src/drone.cpp
     src/sensors/ideal_barometer.cpp
@@ -86,6 +90,7 @@ add_executable(daedalia
     src/sensors/ideal_imu.cpp
     src/sensors/ideal_magnetometer.cpp
 )
+target_include_directories(daedalia PRIVATE src)
 target_link_libraries(daedalia PRIVATE controller SDL3::SDL3 Jolt glm::glm glad imgui OpenGL::GL)
 
 if(BUILD_TESTING)

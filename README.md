@@ -57,6 +57,6 @@ The `Sensors` panel shows the latest ideal IMU, GPS, barometer, and magnetometer
 - Sensor behavior and physics-independent sample types live in `src/sensors/`.
 - Flight controllers and their physics-independent input/output contract live in `src/controllers/`.
 - Vehicle geometry, motors, and force application live in `src/drone.*`.
-- `src/main.cpp` owns the fixed-step simulation loop, rendering, and debug UI.
+- `src/app/` owns the fixed-step simulation, application loop, rendering, and debug UI; `src/main.cpp` is the launcher.
 
 Near-term work is to replace the constant-throttle demo with a tuned closed-loop controller, then add realistic sensor imperfections and experiment with different aircraft layouts.
