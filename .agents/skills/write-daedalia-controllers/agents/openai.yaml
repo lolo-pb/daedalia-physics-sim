@@ -1,0 +1,4 @@
+interface:
+  display_name: "Write Daedalia Controllers"
+  short_description: "Create and modify flight controllers for this simulator"
+  default_prompt: "Use $write-daedalia-controllers to add or update a flight controller using this repository's conventions."

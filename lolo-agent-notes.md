@@ -84,7 +84,21 @@ One call to Simulation::Step() performs:
 
      This is implemented at src/app/simulation.cpp:287.
 
-## File responsibilities
+
+ Switching mid-flight
+
+  When you select another controller:
+
+  1. active_controller changes.
+  2. The newly selected controller is reset, if it is stateful.
+  3. The drone’s physical state is untouched.
+  4. On the next physics step, the new controller receives current sensor readings
+     and replaces all four motor commands.
+
+  So switching takes effect at the next fixed simulation step. If paused, the
+  selection and controller reset happen immediately, but no new motor output is
+  produced until you step or resume.
+File responsibilities
 
    File                Responsibility
   ━━━━━━━━━━━━━━━━━━  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
