@@ -6,7 +6,7 @@ description: Add or modify flight controllers in the Daedalia physics simulator.
 # Write Daedalia Controllers
 
 Keep controller work scoped to `src/controllers/`. If integration requires a small change elsewhere ask and wait for confirmation.
-Do not alter the drone or physics model unless the user asks for it.
+Do not alter the drone or physics model unless the user asks for it. Do not modify other controllers, keep evrthing scoped to the one you are told to edit or create.
 
 Also ask and wait for confirmation when you believe the controller requires new sensors, dont add sensors unless given permission.
 
