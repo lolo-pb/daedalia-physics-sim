@@ -258,9 +258,7 @@ int RunInteractiveApplication(Simulation &simulation) {
         }
 
         ControllerKeys controller_keys;
-        if (simulation.GetActiveController() == FlightController::ManualHover
-            && !looking
-            && !ImGui::GetIO().WantCaptureKeyboard) {
+        if (!looking && !ImGui::GetIO().WantCaptureKeyboard) {
             controller_keys.w = keys[SDL_SCANCODE_W];
             controller_keys.a = keys[SDL_SCANCODE_A];
             controller_keys.s = keys[SDL_SCANCODE_S];
