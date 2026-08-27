@@ -163,6 +163,7 @@ struct Simulation::Impl {
     IdealBarometerModel barometer_model;
     IdealMagnetometerModel magnetometer_model;
     TargetDrone target_drone;
+    DemoController demo_controller;
     ManualController manual_controller;
     PositionHoldController position_hold_controller;
     FlightController active_controller = FlightController::Demo;
@@ -264,12 +265,11 @@ struct Simulation::Impl {
             && std::fabs(checked_gps_sample.world_velocity_meters_per_second.z - checked_velocity.GetZ()) < 1.0e-6f;
     }
 
-    bool HasExpectedDemoControllerState() const {
-        return simulation_time > 0.99
-            && target_drone.GetMotorTarget(MotorId::FrontLeft) == 0.8f
-            && target_drone.GetMotorTarget(MotorId::FrontRight) == 0.8f
-            && target_drone.GetMotorTarget(MotorId::RearRight) == 0.8f
-            && target_drone.GetMotorTarget(MotorId::RearLeft) == 0.8f;
+    bool HasDemoMotorTarget(float target) const {
+        return target_drone.GetMotorTarget(MotorId::FrontLeft) == target
+            && target_drone.GetMotorTarget(MotorId::FrontRight) == target
+            && target_drone.GetMotorTarget(MotorId::RearRight) == target
+            && target_drone.GetMotorTarget(MotorId::RearLeft) == target;
     }
 };
 
@@ -317,7 +317,7 @@ void Simulation::Step(const ControllerKeys &controller_keys) {
         controller_keys,
     };
     if (impl_->active_controller == FlightController::Demo) {
-        UpdateDemoController(controller_input, impl_->target_drone);
+        impl_->demo_controller.Update(controller_input, impl_->target_drone);
     } else if (impl_->active_controller == FlightController::ManualHover) {
         impl_->manual_controller.Update(controller_input, impl_->target_drone);
     } else {
@@ -346,14 +346,32 @@ void Simulation::Reset() {
 
 int Simulation::RunSmokeTest() {
     const bool initial_sensor_state_is_valid = impl_->HasValidInitialSensorState();
-    for (int step = 0; step < impl_->physics_frequency_hz; ++step) {
+    Step(ControllerKeys{});
+    const bool demo_started_disarmed = impl_->HasDemoMotorTarget(0.0f);
+    ControllerKeys arm_demo;
+    arm_demo.x = true;
+    Step(arm_demo);
+    const bool demo_armed = impl_->HasDemoMotorTarget(0.8f);
+    Step(arm_demo);
+    const bool held_x_did_not_retrigger = impl_->HasDemoMotorTarget(0.8f);
+    Step(ControllerKeys{});
+    Step(arm_demo);
+    const bool demo_disarmed = impl_->HasDemoMotorTarget(0.0f);
+    Step(ControllerKeys{});
+    Step(arm_demo);
+    for (int step = 7; step < impl_->physics_frequency_hz; ++step) {
         Step(ControllerKeys{});
     }
+    const bool demo_remained_armed = impl_->HasDemoMotorTarget(0.8f);
 
     const bool demo_state_is_valid = initial_sensor_state_is_valid
+        && demo_started_disarmed
+        && demo_armed
+        && held_x_did_not_retrigger
+        && demo_disarmed
+        && demo_remained_armed
         && impl_->HasFiniteSimulationState()
-        && impl_->HasConsistentSensorState()
-        && impl_->HasExpectedDemoControllerState();
+        && impl_->HasConsistentSensorState();
     if (!demo_state_is_valid) {
         std::fprintf(stderr, "Simulation smoke test failed\n");
         return EXIT_FAILURE;

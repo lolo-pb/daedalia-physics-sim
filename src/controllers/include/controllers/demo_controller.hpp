@@ -2,4 +2,11 @@
 
 #include "controllers/controller_io.hpp"
 
-void UpdateDemoController(const ControllerInput &input, TargetDrone &drone);
+class DemoController {
+public:
+  void Update(const ControllerInput &input, TargetDrone &drone);
+
+private:
+  bool armed_ = false;
+  bool x_was_down_ = false;
+};

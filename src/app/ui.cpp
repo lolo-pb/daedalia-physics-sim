@@ -27,6 +27,9 @@ PhysicsPanelResult DrawPhysicsPanel(
     if (ImGui::RadioButton("3 Position Hold", simulation.GetActiveController() == FlightController::PositionHold)) {
         simulation.SelectController(3);
     }
+    if (simulation.GetActiveController() == FlightController::Demo) {
+        ImGui::TextUnformatted("X arm/disarm motors");
+    }
     if (simulation.GetActiveController() == FlightController::ManualHover) {
         ImGui::Text("Throttle: %.3f", simulation.GetManualControllerThrottle());
         ImGui::TextUnformatted("W/S pitch, A/D roll, Q/E yaw, R/F throttle");

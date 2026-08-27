@@ -269,6 +269,7 @@ int RunInteractiveApplication(Simulation &simulation) {
             controller_keys.e = keys[SDL_SCANCODE_E];
             controller_keys.r = keys[SDL_SCANCODE_R];
             controller_keys.f = keys[SDL_SCANCODE_F];
+            controller_keys.x = keys[SDL_SCANCODE_X];
         }
 
         if (single_step) {

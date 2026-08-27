@@ -36,6 +36,7 @@ struct ControllerKeys {
     bool e = false;
     bool r = false;
     bool f = false;
+    bool x = false;
 };
 
 struct ControllerInput {
