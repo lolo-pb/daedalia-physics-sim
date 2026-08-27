@@ -27,7 +27,6 @@ PhysicsPanelResult DrawPhysicsPanel(
     if (ImGui::RadioButton("3 HorizonMode", simulation.GetActiveController() == FlightController::HorizonMode)) {
         simulation.SelectController(3);
     }
-    ImGui::SameLine();
     if (ImGui::RadioButton("4 Position Hold", simulation.GetActiveController() == FlightController::PositionHold)) {
         simulation.SelectController(4);
     }
