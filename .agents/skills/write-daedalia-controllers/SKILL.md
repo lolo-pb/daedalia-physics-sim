@@ -20,7 +20,6 @@ Also ask and wait for confirmation when you believe the controller requires new 
 - Command the aircraft only through `TargetDrone::SetMotorTarget`.
 - Treat motor targets as normalized values from `0.0` to `1.0`.
 - Keep simulator ground truth out of controller code unless the user explicitly requests a non-realistic controller.
-- Give stateful controllers a `Reset()` method and reset their internal estimates and integrators when selected or when the simulation resets.
 
 ## Workflow
 
