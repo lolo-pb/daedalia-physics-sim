@@ -18,7 +18,7 @@ Jolt physics -> simulated sensors -> flight controller -> motor model -> forces 
 - Four normalized motor outputs driving quadcopter thrust and reaction torque.
 - An OpenGL view and ImGui panel for inspecting ground truth, sensor output, and simulation state.
 
-The included controllers provide a constant-throttle demo, manual attitude control, and movable position hold.
+The included controllers provide a constant-throttle demo, angle-limited manual control, unlimited-angle HorizonMode control, and movable position hold.
 
 ## Build and run
 
@@ -47,7 +47,9 @@ The smoke test initializes and steps the real physics simulation without opening
 - Use `Space` to rise and `Ctrl` to descend.
 - Hold `Shift` to move faster.
 - Enable `Follow drone` in the `Physics` panel to keep the camera aimed at and moving with the drone.
-- Select controller slot `3` for Position Hold. `W`/`S` move the held target forward/backward, `A`/`D` move it sideways, `Q`/`E` change heading, and `R`/`F` change altitude.
+- Select controller slot `2` for AngleMode. `W`/`S` command pitch, `A`/`D` command roll, `Q`/`E` change heading, and `R`/`F` change throttle.
+- Select controller slot `3` for HorizonMode. It uses the same controls, but holding pitch or roll continuously rotates the target so flips are possible.
+- Select controller slot `4` for Position Hold. `W`/`S` move the held target forward/backward, `A`/`D` move it sideways, `Q`/`E` change heading, and `R`/`F` change altitude.
 
 The `Physics` panel can pause, reset, or single-step the simulation, set the physics frequency from 1 to 120 Hz, adjust gravity and camera follow, and inspect the drone's ground-truth state. The default physics frequency is 30 Hz.
 

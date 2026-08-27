@@ -1,4 +1,4 @@
-#include "controllers/manual_controller.hpp"
+#include "controllers/angle_mode_controller.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -17,12 +17,14 @@ float KeyAxis(bool positive, bool negative) {
 
 } // namespace
 
-void ManualController::Reset() {
+void AngleModeController::Reset() {
     attitude_controller_.Reset();
     setpoint_ = AttitudeSetpoint{.throttle = HoverThrottle};
 }
 
-void ManualController::Update(const ControllerInput &input, TargetDrone &drone) {
+void AngleModeController::Update(
+    const ControllerInput &input,
+    TargetDrone &drone) {
     const ControllerKeys &keys = input.keys;
 
     setpoint_.pitch_rad = TiltRadians * KeyAxis(keys.s, keys.w);
@@ -47,6 +49,6 @@ void ManualController::Update(const ControllerInput &input, TargetDrone &drone) 
     attitude_controller_.Update(input, setpoint_, drone);
 }
 
-float ManualController::GetThrottle() const {
+float AngleModeController::GetThrottle() const {
     return setpoint_.throttle;
 }

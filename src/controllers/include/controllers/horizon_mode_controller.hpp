@@ -2,7 +2,7 @@
 
 #include "controllers/attitude_controller.hpp"
 
-class ManualController {
+class HorizonModeController {
 public:
     void Reset();
     void Update(const ControllerInput &input, TargetDrone &drone);

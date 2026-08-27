@@ -47,7 +47,7 @@ public:
     int RunSmokeTest();
 
     FlightController GetActiveController() const;
-    float GetManualControllerThrottle() const;
+    float GetActiveControllerThrottle() const;
 
     int GetPhysicsFrequencyHz() const;
     double GetPhysicsStepSeconds() const;

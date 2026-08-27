@@ -20,19 +20,27 @@ PhysicsPanelResult DrawPhysicsPanel(
         simulation.SelectController(1);
     }
     ImGui::SameLine();
-    if (ImGui::RadioButton("2 Manual Hover", simulation.GetActiveController() == FlightController::ManualHover)) {
+    if (ImGui::RadioButton("2 AngleMode", simulation.GetActiveController() == FlightController::AngleMode)) {
         simulation.SelectController(2);
     }
     ImGui::SameLine();
-    if (ImGui::RadioButton("3 Position Hold", simulation.GetActiveController() == FlightController::PositionHold)) {
+    if (ImGui::RadioButton("3 HorizonMode", simulation.GetActiveController() == FlightController::HorizonMode)) {
         simulation.SelectController(3);
+    }
+    ImGui::SameLine();
+    if (ImGui::RadioButton("4 Position Hold", simulation.GetActiveController() == FlightController::PositionHold)) {
+        simulation.SelectController(4);
     }
     if (simulation.GetActiveController() == FlightController::Demo) {
         ImGui::TextUnformatted("X arm/disarm motors");
     }
-    if (simulation.GetActiveController() == FlightController::ManualHover) {
-        ImGui::Text("Throttle: %.3f", simulation.GetManualControllerThrottle());
+    if (simulation.GetActiveController() == FlightController::AngleMode
+        || simulation.GetActiveController() == FlightController::HorizonMode) {
+        ImGui::Text("Throttle: %.3f", simulation.GetActiveControllerThrottle());
         ImGui::TextUnformatted("W/S pitch, A/D roll, Q/E yaw, R/F throttle");
+        if (simulation.GetActiveController() == FlightController::HorizonMode) {
+            ImGui::TextUnformatted("Hold pitch or roll to rotate without an angle limit");
+        }
         ImGui::TextUnformatted("Hold right mouse for camera controls");
     }
     if (simulation.GetActiveController() == FlightController::PositionHold) {

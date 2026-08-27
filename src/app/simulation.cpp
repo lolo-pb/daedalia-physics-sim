@@ -20,8 +20,9 @@
 #include <Jolt/Physics/PhysicsSystem.h>
 #include <Jolt/RegisterTypes.h>
 
+#include "controllers/angle_mode_controller.hpp"
 #include "controllers/demo_controller.hpp"
-#include "controllers/manual_controller.hpp"
+#include "controllers/horizon_mode_controller.hpp"
 #include "controllers/position_hold_controller.hpp"
 #include "drone.hpp"
 #include "sensors/ideal_barometer.hpp"
@@ -164,7 +165,8 @@ struct Simulation::Impl {
     IdealMagnetometerModel magnetometer_model;
     TargetDrone target_drone;
     DemoController demo_controller;
-    ManualController manual_controller;
+    AngleModeController angle_mode_controller;
+    HorizonModeController horizon_mode_controller;
     PositionHoldController position_hold_controller;
     FlightController active_controller = FlightController::Demo;
     std::array<float, 3> gravity{0.0f, -9.81f, 0.0f};
@@ -299,8 +301,10 @@ void Simulation::SelectController(int slot) {
         || impl_->active_controller == previous_controller) {
         return;
     }
-    if (impl_->active_controller == FlightController::ManualHover) {
-        impl_->manual_controller.Reset();
+    if (impl_->active_controller == FlightController::AngleMode) {
+        impl_->angle_mode_controller.Reset();
+    } else if (impl_->active_controller == FlightController::HorizonMode) {
+        impl_->horizon_mode_controller.Reset();
     } else if (impl_->active_controller == FlightController::PositionHold) {
         impl_->position_hold_controller.Reset();
     }
@@ -318,9 +322,11 @@ void Simulation::Step(const ControllerKeys &controller_keys) {
     };
     if (impl_->active_controller == FlightController::Demo) {
         impl_->demo_controller.Update(controller_input, impl_->target_drone);
-    } else if (impl_->active_controller == FlightController::ManualHover) {
-        impl_->manual_controller.Update(controller_input, impl_->target_drone);
-    } else {
+    } else if (impl_->active_controller == FlightController::AngleMode) {
+        impl_->angle_mode_controller.Update(controller_input, impl_->target_drone);
+    } else if (impl_->active_controller == FlightController::HorizonMode) {
+        impl_->horizon_mode_controller.Update(controller_input, impl_->target_drone);
+    } else if (impl_->active_controller == FlightController::PositionHold) {
         impl_->position_hold_controller.Update(
             controller_input, impl_->target_drone);
     }
@@ -340,7 +346,8 @@ void Simulation::Reset() {
     impl_->imu_model.Reset(impl_->Bodies().GetLinearVelocity(impl_->DroneId()));
     impl_->simulation_time = 0.0;
     impl_->SampleSensors();
-    impl_->manual_controller.Reset();
+    impl_->angle_mode_controller.Reset();
+    impl_->horizon_mode_controller.Reset();
     impl_->position_hold_controller.Reset();
 }
 
@@ -378,7 +385,13 @@ int Simulation::RunSmokeTest() {
     }
 
     Reset();
+    SelectController(2);
+    const bool angle_mode_selected =
+        GetActiveController() == FlightController::AngleMode;
     SelectController(3);
+    const bool horizon_mode_selected =
+        GetActiveController() == FlightController::HorizonMode;
+    SelectController(4);
     const bool position_hold_selected =
         GetActiveController() == FlightController::PositionHold;
     SelectController(9);
@@ -421,7 +434,9 @@ int Simulation::RunSmokeTest() {
         && std::fabs(reset_hold.position.GetZ()) < 0.1
         && reset_hold.linear_velocity.Length() < 0.2f;
 
-    const bool state_is_valid = position_hold_selected
+    const bool state_is_valid = angle_mode_selected
+        && horizon_mode_selected
+        && position_hold_selected
         && invalid_slot_was_ignored
         && stationary_hold_is_stable
         && moved_target_is_held
@@ -454,8 +469,11 @@ FlightController Simulation::GetActiveController() const {
     return impl_->active_controller;
 }
 
-float Simulation::GetManualControllerThrottle() const {
-    return impl_->manual_controller.GetThrottle();
+float Simulation::GetActiveControllerThrottle() const {
+    if (impl_->active_controller == FlightController::HorizonMode) {
+        return impl_->horizon_mode_controller.GetThrottle();
+    }
+    return impl_->angle_mode_controller.GetThrottle();
 }
 
 int Simulation::GetPhysicsFrequencyHz() const {
