@@ -83,6 +83,7 @@ add_executable(daedalia
     src/app/application.cpp
     src/app/renderer.cpp
     src/app/simulation.cpp
+    src/app/startup_animation.cpp
     src/app/ui.cpp
     src/main.cpp
     src/drone.cpp

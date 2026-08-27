@@ -18,6 +18,7 @@
 
 #include "renderer.hpp"
 #include "simulation.hpp"
+#include "startup_animation.hpp"
 #include "ui.hpp"
 
 namespace {
@@ -165,6 +166,7 @@ int RunInteractiveApplication(Simulation &simulation) {
         return EXIT_FAILURE;
     }
     SDL_Window *window = resources.Window();
+    if (!PlayStartupAnimation(window)) return EXIT_SUCCESS;
     Renderer &renderer = resources.GetRenderer();
     bool running = true;
     bool looking = false;
