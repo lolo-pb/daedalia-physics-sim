@@ -10,6 +10,8 @@
 #include "controllers/controller_selection.hpp"
 #include "sensors/sensor_types.hpp"
 
+struct DroneDefinition;
+
 class PhysicsRuntime {
 public:
     PhysicsRuntime();
@@ -36,7 +38,7 @@ struct DroneRenderState {
 
 class Simulation {
 public:
-    Simulation();
+    explicit Simulation(const DroneDefinition &drone_definition);
     ~Simulation();
 
     Simulation(const Simulation &) = delete;

@@ -201,8 +201,8 @@ struct Simulation::Impl {
     BarometerSample latest_barometer_sample;
     MagnetometerSample latest_magnetometer_sample;
 
-    Impl() :
-        drone(world.physics.GetBodyInterface(), CreateQuadcopterDefinition()),
+    explicit Impl(const DroneDefinition &drone_definition) :
+        drone(world.physics.GetBodyInterface(), drone_definition),
         motor_commands(drone.GetMotorCount()) {
         imu_model.Reset(Bodies().GetLinearVelocity(DroneId()));
         SampleSensors();
@@ -316,7 +316,8 @@ PhysicsRuntime::~PhysicsRuntime() {
     JPH::Factory::sInstance = nullptr;
 }
 
-Simulation::Simulation() : impl_(std::make_unique<Impl>()) {}
+Simulation::Simulation(const DroneDefinition &drone_definition) :
+    impl_(std::make_unique<Impl>(drone_definition)) {}
 
 Simulation::~Simulation() = default;
 

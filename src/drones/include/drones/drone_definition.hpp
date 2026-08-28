@@ -1,5 +1,8 @@
 #pragma once
 
+#include <optional>
+#include <span>
+#include <string_view>
 #include <vector>
 
 #include <Jolt/Jolt.h>
@@ -21,4 +24,19 @@ struct DroneDefinition {
     std::vector<MotorDefinition> motors;
 };
 
+enum class DroneType {
+    Quadcopter,
+};
+
+struct DroneOption {
+    DroneType type;
+    std::string_view command_name;
+    std::string_view display_name;
+};
+
+inline constexpr DroneType DefaultDroneType = DroneType::Quadcopter;
+
+std::span<const DroneOption> GetAvailableDroneOptions();
+std::optional<DroneType> FindAvailableDroneType(std::string_view command_name);
+DroneDefinition CreateDroneDefinition(DroneType type);
 DroneDefinition CreateQuadcopterDefinition();

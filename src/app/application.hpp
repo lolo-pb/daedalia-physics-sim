@@ -1,5 +1,7 @@
 #pragma once
 
-class Simulation;
+#include <optional>
 
-int RunInteractiveApplication(Simulation &simulation);
+#include "drones/drone_definition.hpp"
+
+int RunInteractiveApplication(std::optional<DroneType> selected_drone);

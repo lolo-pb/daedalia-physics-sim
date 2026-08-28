@@ -82,6 +82,7 @@ target_include_directories(controller PUBLIC
 
 add_executable(daedalia
     src/app/application.cpp
+    src/app/drone_selection_menu.cpp
     src/app/renderer.cpp
     src/app/simulation.cpp
     src/app/startup_animation.cpp
@@ -101,5 +102,8 @@ target_include_directories(daedalia PRIVATE
 target_link_libraries(daedalia PRIVATE controller SDL3::SDL3 Jolt glm::glm glad imgui OpenGL::GL)
 
 if(BUILD_TESTING)
-    add_test(NAME simulation_smoke_test COMMAND daedalia --smoke-test)
+    add_test(
+        NAME simulation_smoke_test
+        COMMAND daedalia --smoke-test --drone quadcopter
+    )
 endif()

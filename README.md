@@ -32,13 +32,23 @@ cmake --build build
 
 CMake downloads SDL, Jolt Physics, GLM, glad, and Dear ImGui during the first configuration.
 
+Without arguments, the app shows the available-drone menu after the startup animation. Use a flag to select a drone directly while keeping the animation:
+
+```sh
+./build/daedalia --drone quadcopter
+```
+
+Run `./build/daedalia --help` to list available drone names. An unavailable name prints a warning and opens the menu.
+
 Run the headless simulation smoke test with:
 
 ```sh
+./build/daedalia --smoke-test --drone quadcopter
+# or through CTest
 ctest --test-dir build --output-on-failure
 ```
 
-The smoke test initializes and steps the real physics simulation without opening a window.
+The smoke test constructs the selected drone and steps the real physics simulation without opening a window. Without `--drone`, it defaults to the quadcopter; an unavailable name prints a warning and also falls back to the quadcopter.
 
 ## Controls
 
