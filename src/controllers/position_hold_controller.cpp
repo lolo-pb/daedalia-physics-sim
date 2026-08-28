@@ -5,6 +5,21 @@
 
 #include "sensors/ideal_barometer.hpp"
 
+/*
+Position Hold behavior:
+- After Reset, the first Update captures current GPS X/Z, barometric altitude,
+  and magnetic heading. With no keys held, those targets remain fixed.
+- W/S and A/D move the horizontal target at 1 m/s relative to target heading;
+  R/F move altitude at 0.5 m/s; Q/E turn target heading at 45 degrees/s.
+- Horizontal position error requests a world velocity capped at 2 m/s. Velocity
+  error requests acceleration capped at 3 m/s^2, then pitch/roll capped at 15
+  degrees. Entry velocity is braked toward the captured point, so it may cross it.
+- Barometric altitude error and GPS vertical velocity set throttle from 0.45 to
+  0.90 around 0.70 hover throttle.
+- Gyro estimates blended with accelerometer and magnetometer measurements feed
+  attitude PIDs; their limited corrections are mixed into normalized motor targets.
+- A non-positive timestep leaves controller state and motor targets unchanged.
+*/
 namespace {
 
 constexpr float Pi = 3.14159265358979323846f;
@@ -14,7 +29,8 @@ constexpr float ComplementaryGyroWeight = 0.98f;
 constexpr float MinimumAccelerationSquared = 1.0e-6f;
 constexpr float HoverThrottle = 0.70f;
 constexpr float HorizontalPositionGain = 0.8f;
-constexpr float HorizontalVelocityGain = 1.2f;
+constexpr float HorizontalVelocityGain = 1.8f;
+constexpr float MaximumHorizontalApproachSpeedMetersPerSecond = 2.0f;
 constexpr float MaximumHorizontalAcceleration = 3.0f;
 constexpr float MaximumTiltRadians = 15.0f * Pi / 180.0f;
 constexpr float AltitudeProportionalGain = 0.08f;
@@ -145,12 +161,26 @@ void PositionHoldController::Update(
         + YawTargetRateRadiansPerSecond * KeyAxis(keys.q, keys.e) * timestep);
 
     const GpsSample &gps = input.gps;
-    float world_acceleration_x = HorizontalPositionGain
-        * (target_world_x_meters_ - gps.world_position_meters.x)
-        - HorizontalVelocityGain * gps.world_velocity_meters_per_second.x;
-    float world_acceleration_z = HorizontalPositionGain
-        * (target_world_z_meters_ - gps.world_position_meters.z)
-        - HorizontalVelocityGain * gps.world_velocity_meters_per_second.z;
+    float desired_world_velocity_x = HorizontalPositionGain
+        / HorizontalVelocityGain
+        * (target_world_x_meters_ - gps.world_position_meters.x);
+    float desired_world_velocity_z = HorizontalPositionGain
+        / HorizontalVelocityGain
+        * (target_world_z_meters_ - gps.world_position_meters.z);
+    const float desired_horizontal_speed = std::hypot(
+        desired_world_velocity_x, desired_world_velocity_z);
+    if (desired_horizontal_speed
+        > MaximumHorizontalApproachSpeedMetersPerSecond) {
+        const float scale = MaximumHorizontalApproachSpeedMetersPerSecond
+            / desired_horizontal_speed;
+        desired_world_velocity_x *= scale;
+        desired_world_velocity_z *= scale;
+    }
+
+    float world_acceleration_x = HorizontalVelocityGain
+        * (desired_world_velocity_x - gps.world_velocity_meters_per_second.x);
+    float world_acceleration_z = HorizontalVelocityGain
+        * (desired_world_velocity_z - gps.world_velocity_meters_per_second.z);
     const float horizontal_acceleration = std::hypot(
         world_acceleration_x, world_acceleration_z);
     if (horizontal_acceleration > MaximumHorizontalAcceleration) {
