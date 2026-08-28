@@ -39,7 +39,8 @@ bool PlayStartupAnimation(SDL_Window *window) {
                 }
                 return false;
             }
-            if (event.type == SDL_EVENT_KEY_DOWN && event.key.scancode == SDL_SCANCODE_ESCAPE) {
+            if (event.type == SDL_EVENT_KEY_DOWN
+                || event.type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
                 if (depth_test_was_enabled) {
                     glEnable(GL_DEPTH_TEST);
                 }
