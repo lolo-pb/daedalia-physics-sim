@@ -24,7 +24,7 @@ void AngleModeController::Reset() {
 
 void AngleModeController::Update(
     const ControllerInput &input,
-    TargetDrone &drone) {
+    MotorCommands &motor_commands) {
     const ControllerKeys &keys = input.keys;
 
     setpoint_.pitch_rad = TiltRadians * KeyAxis(keys.s, keys.w);
@@ -46,7 +46,7 @@ void AngleModeController::Update(
             1.0f);
     }
 
-    attitude_controller_.Update(input, setpoint_, drone);
+    attitude_controller_.Update(input, setpoint_, motor_commands);
 }
 
 float AngleModeController::GetThrottle() const {

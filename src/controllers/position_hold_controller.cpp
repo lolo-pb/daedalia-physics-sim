@@ -44,6 +44,10 @@ constexpr float MaximumThrottle = 0.90f;
 constexpr float HorizontalTargetSpeedMetersPerSecond = 1.0f;
 constexpr float AltitudeTargetSpeedMetersPerSecond = 0.5f;
 constexpr float YawTargetRateRadiansPerSecond = 45.0f * Pi / 180.0f;
+constexpr std::size_t FrontLeftMotor = 0;
+constexpr std::size_t FrontRightMotor = 1;
+constexpr std::size_t RearRightMotor = 2;
+constexpr std::size_t RearLeftMotor = 3;
 
 struct PidGains {
     float proportional;
@@ -93,22 +97,22 @@ float UpdatePid(
 }
 
 void MixMotorTargets(
-    TargetDrone &drone,
+    MotorCommands &motor_commands,
     float throttle,
     float pitch_correction,
     float roll_correction,
     float yaw_correction) {
-    drone.SetMotorTarget(
-        MotorId::FrontLeft,
+    motor_commands.SetMotor(
+        FrontLeftMotor,
         throttle + pitch_correction - roll_correction + yaw_correction);
-    drone.SetMotorTarget(
-        MotorId::FrontRight,
+    motor_commands.SetMotor(
+        FrontRightMotor,
         throttle + pitch_correction + roll_correction - yaw_correction);
-    drone.SetMotorTarget(
-        MotorId::RearRight,
+    motor_commands.SetMotor(
+        RearRightMotor,
         throttle - pitch_correction + roll_correction + yaw_correction);
-    drone.SetMotorTarget(
-        MotorId::RearLeft,
+    motor_commands.SetMotor(
+        RearLeftMotor,
         throttle - pitch_correction - roll_correction - yaw_correction);
 }
 
@@ -131,7 +135,7 @@ void PositionHoldController::Reset() {
 
 void PositionHoldController::Update(
     const ControllerInput &input,
-    TargetDrone &drone) {
+    MotorCommands &motor_commands) {
     const float timestep = input.timestep_seconds;
     if (timestep <= 0.0f) {
         return;
@@ -239,7 +243,7 @@ void PositionHoldController::Update(
         YawGains,
         yaw_integral_);
     MixMotorTargets(
-        drone,
+        motor_commands,
         throttle,
         pitch_correction,
         roll_correction,

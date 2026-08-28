@@ -17,7 +17,7 @@ public:
     void Update(
         const ControllerInput &input,
         const AttitudeSetpoint &setpoint,
-        TargetDrone &drone);
+        MotorCommands &motor_commands);
 
 private:
     void UpdateAttitudeEstimate(const ImuSample &imu, float timestep);

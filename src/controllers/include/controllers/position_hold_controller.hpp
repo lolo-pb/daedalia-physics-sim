@@ -5,7 +5,7 @@
 class PositionHoldController {
 public:
     void Reset();
-    void Update(const ControllerInput &input, TargetDrone &drone);
+    void Update(const ControllerInput &input, MotorCommands &motor_commands);
 
 private:
     void CaptureTarget(const ControllerInput &input);

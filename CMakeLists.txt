@@ -87,13 +87,17 @@ add_executable(daedalia
     src/app/startup_animation.cpp
     src/app/ui.cpp
     src/main.cpp
-    src/drone.cpp
+    src/drones/drone.cpp
+    src/drones/drone_definition.cpp
     src/sensors/ideal_barometer.cpp
     src/sensors/ideal_gps.cpp
     src/sensors/ideal_imu.cpp
     src/sensors/ideal_magnetometer.cpp
 )
-target_include_directories(daedalia PRIVATE src)
+target_include_directories(daedalia PRIVATE
+    src
+    src/drones/include
+)
 target_link_libraries(daedalia PRIVATE controller SDL3::SDL3 Jolt glm::glm glad imgui OpenGL::GL)
 
 if(BUILD_TESTING)

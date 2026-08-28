@@ -2,6 +2,7 @@
 
 #include <array>
 #include <memory>
+#include <vector>
 
 #include <Jolt/Jolt.h>
 
@@ -29,7 +30,8 @@ struct DroneInspection {
 struct DroneRenderState {
     JPH::RVec3 position;
     JPH::Quat rotation;
-    std::array<JPH::RVec3, 4> motor_positions;
+    JPH::Vec3 body_half_extent;
+    std::vector<JPH::RVec3> motor_positions;
 };
 
 class Simulation {

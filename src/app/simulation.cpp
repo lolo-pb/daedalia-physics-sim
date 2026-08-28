@@ -24,7 +24,8 @@
 #include "controllers/demo_controller.hpp"
 #include "controllers/horizon_mode_controller.hpp"
 #include "controllers/position_hold_controller.hpp"
-#include "drone.hpp"
+#include "drones/drone.hpp"
+#include "drones/drone_definition.hpp"
 #include "sensors/ideal_barometer.hpp"
 #include "sensors/ideal_gps.hpp"
 #include "sensors/ideal_imu.hpp"
@@ -119,6 +120,28 @@ static_assert(WorkerThreadCount(2) == 1);
 static_assert(WorkerThreadCount(8) == 7);
 static_assert(WorkerThreadCount(std::numeric_limits<unsigned>::max()) == std::numeric_limits<int>::max());
 
+bool HasSafeMotorCommandBehavior() {
+    MotorCommands commands(2);
+    commands.SetMotor(0, -0.5f);
+    commands.SetMotor(1, 1.5f);
+    commands.SetMotor(2, 0.5f);
+    const bool values_are_bounded = commands.GetMotor(0) == 0.0f
+        && commands.GetMotor(1) == 1.0f
+        && commands.GetMotor(2) == 0.0f;
+
+    commands.SetMotor(0, std::numeric_limits<float>::quiet_NaN());
+    commands.SetMotor(1, std::numeric_limits<float>::infinity());
+    const bool nonfinite_values_are_zero = commands.GetMotor(0) == 0.0f
+        && commands.GetMotor(1) == 0.0f;
+
+    commands.SetMotor(0, 0.5f);
+    commands.Clear();
+    const bool clear_resets_commands = commands.GetMotor(0) == 0.0f;
+    return values_are_bounded
+        && nonfinite_values_are_zero
+        && clear_resets_commands;
+}
+
 struct PhysicsWorld {
     JPH::TempAllocatorImpl temp_allocator;
     JPH::JobSystemThreadPool job_system;
@@ -163,7 +186,7 @@ struct Simulation::Impl {
     IdealGpsModel gps_model;
     IdealBarometerModel barometer_model;
     IdealMagnetometerModel magnetometer_model;
-    TargetDrone target_drone;
+    MotorCommands motor_commands;
     DemoController demo_controller;
     AngleModeController angle_mode_controller;
     HorizonModeController horizon_mode_controller;
@@ -178,7 +201,9 @@ struct Simulation::Impl {
     BarometerSample latest_barometer_sample;
     MagnetometerSample latest_magnetometer_sample;
 
-    Impl() : drone(world.physics.GetBodyInterface()) {
+    Impl() :
+        drone(world.physics.GetBodyInterface(), CreateQuadcopterDefinition()),
+        motor_commands(drone.GetMotorCount()) {
         imu_model.Reset(Bodies().GetLinearVelocity(DroneId()));
         SampleSensors();
     }
@@ -268,10 +293,10 @@ struct Simulation::Impl {
     }
 
     bool HasDemoMotorTarget(float target) const {
-        return target_drone.GetMotorTarget(MotorId::FrontLeft) == target
-            && target_drone.GetMotorTarget(MotorId::FrontRight) == target
-            && target_drone.GetMotorTarget(MotorId::RearRight) == target
-            && target_drone.GetMotorTarget(MotorId::RearLeft) == target;
+        return motor_commands.GetMotor(0) == target
+            && motor_commands.GetMotor(1) == target
+            && motor_commands.GetMotor(2) == target
+            && motor_commands.GetMotor(3) == target;
     }
 };
 
@@ -320,17 +345,20 @@ void Simulation::Step(const ControllerKeys &controller_keys) {
         static_cast<float>(impl_->physics_step),
         controller_keys,
     };
+    impl_->motor_commands.Clear();
     if (impl_->active_controller == FlightController::Demo) {
-        impl_->demo_controller.Update(controller_input, impl_->target_drone);
+        impl_->demo_controller.Update(controller_input, impl_->motor_commands);
     } else if (impl_->active_controller == FlightController::AngleMode) {
-        impl_->angle_mode_controller.Update(controller_input, impl_->target_drone);
+        impl_->angle_mode_controller.Update(
+            controller_input, impl_->motor_commands);
     } else if (impl_->active_controller == FlightController::HorizonMode) {
-        impl_->horizon_mode_controller.Update(controller_input, impl_->target_drone);
+        impl_->horizon_mode_controller.Update(
+            controller_input, impl_->motor_commands);
     } else if (impl_->active_controller == FlightController::PositionHold) {
         impl_->position_hold_controller.Update(
-            controller_input, impl_->target_drone);
+            controller_input, impl_->motor_commands);
     }
-    impl_->drone.SetMotorTargets(impl_->target_drone);
+    impl_->drone.SetMotorTargets(impl_->motor_commands);
     impl_->drone.UpdateMotors();
     impl_->drone.ApplyForces(impl_->Bodies());
     impl_->world.physics.Update(
@@ -352,6 +380,7 @@ void Simulation::Reset() {
 }
 
 int Simulation::RunSmokeTest() {
+    const bool motor_commands_are_safe = HasSafeMotorCommandBehavior();
     const bool initial_sensor_state_is_valid = impl_->HasValidInitialSensorState();
     Step(ControllerKeys{});
     const bool demo_started_disarmed = impl_->HasDemoMotorTarget(0.0f);
@@ -371,7 +400,8 @@ int Simulation::RunSmokeTest() {
     }
     const bool demo_remained_armed = impl_->HasDemoMotorTarget(0.8f);
 
-    const bool demo_state_is_valid = initial_sensor_state_is_valid
+    const bool demo_state_is_valid = motor_commands_are_safe
+        && initial_sensor_state_is_valid
         && demo_started_disarmed
         && demo_armed
         && held_x_did_not_retrigger
@@ -525,6 +555,7 @@ DroneRenderState Simulation::GetDroneRenderState() const {
     return {
         position,
         rotation,
+        impl_->drone.GetBodyHalfExtent(),
         impl_->drone.GetMotorWorldPositions(position, rotation),
     };
 }
