@@ -16,6 +16,7 @@
 
 #include <glm/ext/matrix_transform.hpp>
 
+#include "drone_selection_menu.hpp"
 #include "renderer.hpp"
 #include "simulation.hpp"
 #include "startup_animation.hpp"
@@ -160,13 +161,20 @@ private:
 
 } // namespace
 
-int RunInteractiveApplication(Simulation &simulation) {
+int RunInteractiveApplication(std::optional<DroneType> selected_drone) {
     ApplicationResources resources;
     if (!resources.Initialize()) {
         return EXIT_FAILURE;
     }
     SDL_Window *window = resources.Window();
     if (!PlayStartupAnimation(window)) return EXIT_SUCCESS;
+    if (!selected_drone) {
+        selected_drone = SelectDroneFromMenu(window);
+        if (!selected_drone) {
+            return EXIT_SUCCESS;
+        }
+    }
+    Simulation simulation(CreateDroneDefinition(*selected_drone));
     Renderer &renderer = resources.GetRenderer();
     bool running = true;
     bool looking = false;

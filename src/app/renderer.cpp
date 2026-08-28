@@ -191,7 +191,11 @@ void Renderer::DrawScene(
 
     const glm::mat4 transform = glm::translate(glm::mat4(1.0f), glm::vec3(drone.position.GetX(), drone.position.GetY(), drone.position.GetZ()))
         * glm::mat4_cast(glm::quat(drone.rotation.GetW(), drone.rotation.GetX(), drone.rotation.GetY(), drone.rotation.GetZ()));
-    DrawMesh(cube_, program_, transform * glm::scale(glm::mat4(1.0f), glm::vec3(0.5f, 0.16f, 0.5f)), glm::vec3(0.85f, 0.35f, 0.15f));
+    const glm::vec3 body_size(
+        drone.body_half_extent.GetX() * 2.0f,
+        drone.body_half_extent.GetY() * 2.0f,
+        drone.body_half_extent.GetZ() * 2.0f);
+    DrawMesh(cube_, program_, transform * glm::scale(glm::mat4(1.0f), body_size), glm::vec3(0.85f, 0.35f, 0.15f));
     for (const JPH::RVec3 &motor_position : drone.motor_positions) {
         const glm::mat4 marker = glm::translate(glm::mat4(1.0f), glm::vec3(motor_position.GetX(), motor_position.GetY(), motor_position.GetZ()))
             * glm::scale(glm::mat4(1.0f), glm::vec3(0.05f));

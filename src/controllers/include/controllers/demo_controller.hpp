@@ -4,7 +4,7 @@
 
 class DemoController {
 public:
-  void Update(const ControllerInput &input, TargetDrone &drone);
+  void Update(const ControllerInput &input, MotorCommands &motor_commands);
 
 private:
   bool armed_ = false;

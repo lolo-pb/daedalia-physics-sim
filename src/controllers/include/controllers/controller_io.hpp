@@ -1,30 +1,35 @@
 #pragma once
 
 #include <algorithm>
-#include <array>
+#include <cmath>
 #include <cstddef>
+#include <vector>
 
 #include "sensors/sensor_types.hpp"
 
-enum class MotorId {
-    FrontLeft,
-    FrontRight,
-    RearRight,
-    RearLeft,
-};
-
-class TargetDrone {
+class MotorCommands {
 public:
-    void SetMotorTarget(MotorId id, float target) {
-        targets_[static_cast<std::size_t>(id)] = std::clamp(target, 0.0f, 1.0f);
+    explicit MotorCommands(std::size_t motor_count) : targets_(motor_count) {}
+
+    void Clear() {
+        std::fill(targets_.begin(), targets_.end(), 0.0f);
     }
 
-    float GetMotorTarget(MotorId id) const {
-        return targets_[static_cast<std::size_t>(id)];
+    void SetMotor(std::size_t index, float target) {
+        if (index >= targets_.size()) {
+            return;
+        }
+        targets_[index] = std::isfinite(target)
+            ? std::clamp(target, 0.0f, 1.0f)
+            : 0.0f;
+    }
+
+    float GetMotor(std::size_t index) const {
+        return index < targets_.size() ? targets_[index] : 0.0f;
     }
 
 private:
-    std::array<float, 4> targets_{};
+    std::vector<float> targets_;
 };
 
 struct ControllerKeys {

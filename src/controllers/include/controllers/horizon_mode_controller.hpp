@@ -5,7 +5,7 @@
 class HorizonModeController {
 public:
     void Reset();
-    void Update(const ControllerInput &input, TargetDrone &drone);
+    void Update(const ControllerInput &input, MotorCommands &motor_commands);
 
     float GetThrottle() const;
 

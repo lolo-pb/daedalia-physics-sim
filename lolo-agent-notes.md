@@ -1,6 +1,6 @@
 # Daedalia Physics Sim
 
-The application is a native C++ simulator. SDL owns the window and OpenGL context, Jolt advances rigid-body physics, and the renderer draws the current Jolt body transforms.
+Daedalia is a native C++ flight-physics test bed. SDL owns the window and OpenGL context, Jolt advances rigid-body physics, ImGui provides debug controls, and the renderer draws the latest simulated state.
 
 Build and run:
 
@@ -10,120 +10,89 @@ cmake --build build
 ./build/daedalia
 ```
 
-Run the headless simulation smoke test with:
+Run the headless smoke test:
 
 ```sh
 ctest --test-dir build --output-on-failure
 ```
 
-The smoke test uses the app's real fixed-step physics path but exits before SDL and window setup.
+## Structure
 
-The app has a free-fly camera and a small ImGui physics panel for inspecting the drone, controlling the simulation, and switching flight controllers. The drone layout and motor model are in `src/drone.*`; controller code lives in `src/controllers/` and writes normalized motor commands.
+- `src/app/` owns startup, the interactive loop, fixed-step simulation, UI, camera, and rendering.
+- `src/sensors/` converts Jolt state into ideal IMU, GPS, barometer, and magnetometer samples.
+- `src/controllers/` receives sensor samples and input keys, then writes normalized indexed motor commands.
+- `src/drones/` defines aircraft layouts and runs their bodies and motors in Jolt.
+- `src/main.cpp` selects interactive or headless mode and owns the Jolt runtime lifetime.
 
-## Controller and simulation models
+Ground-truth position, attitude, and velocity stay inside the simulation and debug UI. Controllers only receive sensor samples.
 
-`src/controllers/controller_io.hpp` is the shared, physics-independent controller contract. A controller receives an `ImuSample`, fixed timestep, raw control keys, and a simulator-owned `TargetDrone` that exposes only four normalized motor targets. `TargetDrone::SetMotorTarget` clamps each target to `0.0` through `1.0`.
+## Drone model
 
-The app can switch controllers at runtime with number keys or the ImGui panel. The demo controller applies constant throttle. Manual Hover interprets keyboard input as attitude, yaw, and throttle commands, then uses the attitude PID to produce motor targets.
+`DroneDefinition` is a blueprint. It contains the body box size, mass, starting pose, and a variable-length list of motors. Each motor definition provides its local position, thrust direction, reaction-torque direction, maximum speed, and force coefficients.
 
-The fixed-step flow is:
+`CreateQuadcopterDefinition()` currently supplies the only aircraft layout. The generic runtime `Drone` consumes that definition, creates the Jolt body, stores changing motor state, and applies motor forces and torques. Rendering also uses the definition's body size and the runtime motor-position list, so it does not assume four motors.
+
+Current quad motor indices are:
 
 ```text
-Jolt state -> ideal IMU -> controller -> motor targets -> motor model -> forces/torques -> Jolt update
+0 front-left
+1 front-right
+2 rear-right
+3 rear-left
 ```
 
-`src/sensors/ideal_imu.*` is where sensor behavior is programmed. It currently converts Jolt truth into ideal body-frame gyro and specific force. It derives acceleration from velocity history, which is reset with the drone.
+Local `+X` is right, `+Y` is up, and `-Z` is front.
 
-`Drone` in `src/drone.*` is one Jolt rigid body with four private motors. Each motor keeps its normalized target separate from its physical speed. `SetMotorTargets`, `UpdateMotors`, and `ApplyForces` are separate phases. Motor speed behavior is programmed in `UpdateMotors`; thrust and reaction torque behavior is programmed in `ApplyForces`. The current model has no lag and both forces remain proportional to speed squared.
+## Controller command boundary
 
-Motor order is `FrontLeft`, `FrontRight`, `RearRight`, `RearLeft`. Local `+X` is right, `+Y` is up, and `-Z` is front.
+`MotorCommands` is the physics-independent output API. Controllers call `SetMotor(index, target)` without receiving the selected drone type or motor count.
 
-Ground-truth position, attitude, and velocities remain available only to simulation and the debug UI. The UI also shows the latest controller-facing IMU sample.
+- The command buffer is sized from the physical drone and cleared before every controller update.
+- Missing commands therefore remain at zero for that step.
+- Extra indices are ignored.
+- Finite targets are clamped to `0.0` through `1.0`.
+- NaN and infinity become zero before reaching the drone.
+
+This keeps controllers independent from aircraft definitions. A controller may be physically unsuitable for a layout, but mismatched motor commands remain safe.
 
 ## Flow
 
-Startup :
+Startup:
 
-  main
-   ├─ initialize Jolt runtime
-   ├─ construct Simulation
-   │   ├─ create physics world and floor
-   │   ├─ create drone
-   │   ├─ create sensors/controllers
-   │   └─ take initial sensor samples
-   └─ run interactive application
-        ├─ initialize SDL, OpenGL, and ImGui
-        ├─ create Renderer
-        └─ repeat every frame
-             1. process events
-             2. draw/update UI controls
-             3. read keyboard input
-             4. advance fixed physics steps
-             5. update camera follow
-             6. render scene and ImGui
-             7. swap window buffers
+```text
+main
+  -> initialize Jolt runtime
+  -> construct Simulation
+       -> create physics world and floor
+       -> create quadcopter definition
+       -> create generic Drone from definition
+       -> size motor command buffer from the drone
+       -> create sensors and controllers
+  -> initialize SDL, OpenGL, ImGui, and Renderer
+  -> play the skippable startup animation
+  -> run the interactive frame loop
+```
 
+One fixed simulation step:
 
-Working loop :
+```text
+Jolt state
+  -> sample sensors
+  -> clear motor commands
+  -> run selected controller
+  -> copy commands for motors that physically exist
+  -> update motor speeds
+  -> apply thrust and reaction torque
+  -> advance Jolt physics
+  -> advance simulation time
+```
 
-One call to Simulation::Step() performs:
-
-     sample sensors
-         ↓
-     run selected controller
-         ↓
-     set motor targets
-         ↓
-     update motor speeds
-         ↓
-     apply forces and torques
-         ↓
-     advance Jolt physics
-         ↓
-     advance simulation time
-
-     This is implemented at src/app/simulation.cpp:287.
-
-
- Switching mid-flight
-
-  When you select another controller:
-
-  1. active_controller changes.
-  2. The newly selected controller is reset, if it is stateful.
-  3. The drone’s physical state is untouched.
-  4. On the next physics step, the new controller receives current sensor readings
-     and replaces all four motor commands.
-
-  So switching takes effect at the next fixed simulation step. If paused, the
-  selection and controller reset happen immediately, but no new motor output is
-  produced until you step or resume.
-File responsibilities
-
-   File                Responsibility
-  ━━━━━━━━━━━━━━━━━━  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   src/main.cpp        Program mode selection and Jolt runtime
-                       lifecycle
-  ──────────────────  ────────────────────────────────────────────
-   src/app/            Window, events, camera, timing, input, and
-   application.cpp     frame loop
-  ──────────────────  ────────────────────────────────────────────
-   src/app/            Public interface between the app and
-   simulation.hpp      simulation
-  ──────────────────  ────────────────────────────────────────────
-   src/app/            Jolt world, drone, sensors, controllers,
-   simulation.cpp      stepping, reset, and smoke validation
-  ──────────────────  ────────────────────────────────────────────
-   src/app/ui.cpp      ImGui panels and UI-to-simulation actions
-  ──────────────────  ────────────────────────────────────────────
-   src/app/            Shaders, meshes, OpenGL drawing, and scene
-   renderer.cpp        transforms
-
+Switching controllers resets the newly selected stateful controller but leaves the drone's physical state untouched. Its next output replaces the motor commands on the next fixed step.
 
 ## Future work
 
-- Tune and validate the attitude PID against the simulated quadcopter.
-- Once the quadcopter is stable, try a weird multirotor layout or a helicopter.
-- More drone layouts, physics visualisation, saved scenarios, and experimental force models.
-
-- Make separate menus in ui for physics real stuff and sensor data
+- Add a startup aircraft-selection menu.
+- Add a simple three-fixed-motor tricopter definition to expose unbalanced reaction torque.
+- Move individual aircraft definitions into clearly named files such as `quadcopter.cpp` and `tricopter.cpp` when the second layout is added.
+- Tune and validate the controllers against the quadcopter.
+- Add more layouts, saved scenarios, and experimental sensor or force models.

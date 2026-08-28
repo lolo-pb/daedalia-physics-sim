@@ -2,12 +2,15 @@
 
 #include <array>
 #include <memory>
+#include <vector>
 
 #include <Jolt/Jolt.h>
 
 #include "controllers/controller_io.hpp"
 #include "controllers/controller_selection.hpp"
 #include "sensors/sensor_types.hpp"
+
+struct DroneDefinition;
 
 class PhysicsRuntime {
 public:
@@ -29,12 +32,13 @@ struct DroneInspection {
 struct DroneRenderState {
     JPH::RVec3 position;
     JPH::Quat rotation;
-    std::array<JPH::RVec3, 4> motor_positions;
+    JPH::Vec3 body_half_extent;
+    std::vector<JPH::RVec3> motor_positions;
 };
 
 class Simulation {
 public:
-    Simulation();
+    explicit Simulation(const DroneDefinition &drone_definition);
     ~Simulation();
 
     Simulation(const Simulation &) = delete;
@@ -45,6 +49,7 @@ public:
     void Reset();
 
     int RunSmokeTest();
+    int RunQuadcopterControlSmokeTest();
 
     FlightController GetActiveController() const;
     float GetActiveControllerThrottle() const;

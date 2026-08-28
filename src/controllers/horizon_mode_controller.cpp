@@ -24,7 +24,7 @@ void HorizonModeController::Reset() {
 
 void HorizonModeController::Update(
     const ControllerInput &input,
-    TargetDrone &drone) {
+    MotorCommands &motor_commands) {
     const ControllerKeys &keys = input.keys;
 
     if (input.timestep_seconds > 0.0f) {
@@ -55,7 +55,7 @@ void HorizonModeController::Update(
             1.0f);
     }
 
-    attitude_controller_.Update(input, setpoint_, drone);
+    attitude_controller_.Update(input, setpoint_, motor_commands);
 }
 
 float HorizonModeController::GetThrottle() const {

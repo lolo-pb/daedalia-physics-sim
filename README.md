@@ -32,13 +32,23 @@ cmake --build build
 
 CMake downloads SDL, Jolt Physics, GLM, glad, and Dear ImGui during the first configuration.
 
+Without arguments, the app shows the available-drone menu after the startup animation. Use a flag to select a drone directly while keeping the animation:
+
+```sh
+./build/daedalia --drone quadcopter
+```
+
+Run `./build/daedalia --help` to list available drone names. An unavailable name prints a warning and opens the menu.
+
 Run the headless simulation smoke test with:
 
 ```sh
+./build/daedalia --smoke-test --drone quadcopter
+# or through CTest
 ctest --test-dir build --output-on-failure
 ```
 
-The smoke test initializes and steps the real physics simulation without opening a window.
+The smoke test constructs the selected drone and steps the real physics simulation without opening a window. Without `--drone`, it defaults to the quadcopter; an unavailable name prints a warning and also falls back to the quadcopter.
 
 ## Controls
 
@@ -59,7 +69,7 @@ The `Sensors` panel shows the latest ideal IMU, GPS, barometer, and magnetometer
 
 - Sensor behavior and physics-independent sample types live in `src/sensors/`.
 - Flight controllers and their physics-independent input/output contract live in `src/controllers/`.
-- Vehicle geometry, motors, and force application live in `src/drone.*`.
+- Vehicle definitions, motors, and force application live in `src/drones/`.
 - `src/app/` owns the fixed-step simulation, application loop, rendering, and debug UI; `src/main.cpp` is the launcher.
 
 The position-hold controller is a standalone closed loop that uses only simulated sensor samples; ground truth remains limited to the simulation and debug UI.

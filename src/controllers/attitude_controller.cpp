@@ -11,6 +11,10 @@ constexpr float ComplementaryGyroWeight = 0.98f;
 constexpr float MinimumAccelerationSquared = 1.0e-6f;
 constexpr float IntegralLimit = 1.0f;
 constexpr float CorrectionLimit = 0.25f;
+constexpr std::size_t FrontLeftMotor = 0;
+constexpr std::size_t FrontRightMotor = 1;
+constexpr std::size_t RearRightMotor = 2;
+constexpr std::size_t RearLeftMotor = 3;
 
 struct PidGains {
   float proportional;
@@ -38,21 +42,21 @@ float UpdatePid(float error, float measured_rate, float timestep,
                     -CorrectionLimit, CorrectionLimit);
 }
 
-void MixMotorTargets(TargetDrone &drone, float throttle,
+void MixMotorTargets(MotorCommands &motor_commands, float throttle,
                      float pitch_correction, float roll_correction,
                      float yaw_correction) {
-  drone.SetMotorTarget(MotorId::FrontLeft,
-                       throttle + pitch_correction - roll_correction +
-                           yaw_correction);
-  drone.SetMotorTarget(MotorId::FrontRight,
-                       throttle + pitch_correction + roll_correction -
-                           yaw_correction);
-  drone.SetMotorTarget(MotorId::RearRight,
-                       throttle - pitch_correction + roll_correction +
-                           yaw_correction);
-  drone.SetMotorTarget(MotorId::RearLeft,
-                       throttle - pitch_correction - roll_correction -
-                           yaw_correction);
+  motor_commands.SetMotor(FrontLeftMotor,
+                          throttle + pitch_correction - roll_correction +
+                              yaw_correction);
+  motor_commands.SetMotor(FrontRightMotor,
+                          throttle + pitch_correction + roll_correction -
+                              yaw_correction);
+  motor_commands.SetMotor(RearRightMotor,
+                          throttle - pitch_correction + roll_correction +
+                              yaw_correction);
+  motor_commands.SetMotor(RearLeftMotor,
+                          throttle - pitch_correction - roll_correction -
+                              yaw_correction);
 }
 
 } // namespace
@@ -69,7 +73,7 @@ void AttitudeController::Reset() {
 
 void AttitudeController::Update(const ControllerInput &input,
                                 const AttitudeSetpoint &setpoint,
-                                TargetDrone &drone) {
+                                MotorCommands &motor_commands) {
   const float timestep = input.timestep_seconds;
   if (timestep <= 0.0f) {
     return;
@@ -88,8 +92,8 @@ void AttitudeController::Update(const ControllerInput &input,
       UpdatePid(WrapAngle(setpoint.yaw_rad - yaw_rad_), gyro.y, timestep,
                 YawGains, yaw_integral_);
 
-  MixMotorTargets(drone, setpoint.throttle, pitch_correction, roll_correction,
-                  yaw_correction);
+  MixMotorTargets(motor_commands, setpoint.throttle, pitch_correction,
+                  roll_correction, yaw_correction);
 }
 
 void AttitudeController::UpdateAttitudeEstimate(const ImuSample &imu,

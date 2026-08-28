@@ -82,20 +82,34 @@ target_include_directories(controller PUBLIC
 
 add_executable(daedalia
     src/app/application.cpp
+    src/app/drone_selection_menu.cpp
     src/app/renderer.cpp
     src/app/simulation.cpp
     src/app/startup_animation.cpp
     src/app/ui.cpp
     src/main.cpp
-    src/drone.cpp
+    src/drones/drone.cpp
+    src/drones/drone_definition.cpp
+    src/drones/quadcopter.cpp
+    src/drones/tricopter.cpp
     src/sensors/ideal_barometer.cpp
     src/sensors/ideal_gps.cpp
     src/sensors/ideal_imu.cpp
     src/sensors/ideal_magnetometer.cpp
 )
-target_include_directories(daedalia PRIVATE src)
+target_include_directories(daedalia PRIVATE
+    src
+    src/drones/include
+)
 target_link_libraries(daedalia PRIVATE controller SDL3::SDL3 Jolt glm::glm glad imgui OpenGL::GL)
 
 if(BUILD_TESTING)
-    add_test(NAME simulation_smoke_test COMMAND daedalia --smoke-test)
+    add_test(
+        NAME quadcopter_smoke_test
+        COMMAND daedalia --smoke-test --drone quadcopter
+    )
+    add_test(
+        NAME tricopter_smoke_test
+        COMMAND daedalia --smoke-test --drone tricopter
+    )
 endif()
