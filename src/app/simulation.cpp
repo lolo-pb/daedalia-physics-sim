@@ -293,10 +293,12 @@ struct Simulation::Impl {
     }
 
     bool HasDemoMotorTarget(float target) const {
-        return motor_commands.GetMotor(0) == target
-            && motor_commands.GetMotor(1) == target
-            && motor_commands.GetMotor(2) == target
-            && motor_commands.GetMotor(3) == target;
+        for (std::size_t index = 0; index < drone.GetMotorCount(); ++index) {
+            if (motor_commands.GetMotor(index) != target) {
+                return false;
+            }
+        }
+        return true;
     }
 };
 
@@ -414,7 +416,10 @@ int Simulation::RunSmokeTest() {
         std::fprintf(stderr, "Simulation smoke test failed\n");
         return EXIT_FAILURE;
     }
+    return EXIT_SUCCESS;
+}
 
+int Simulation::RunQuadcopterControlSmokeTest() {
     Reset();
     SelectController(2);
     const bool angle_mode_selected =
@@ -492,7 +497,6 @@ int Simulation::RunSmokeTest() {
             reset_hold.position.GetZ());
         return EXIT_FAILURE;
     }
-    std::printf("Simulation smoke test passed\n");
     return EXIT_SUCCESS;
 }
 

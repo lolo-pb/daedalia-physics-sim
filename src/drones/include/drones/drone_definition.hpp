@@ -26,6 +26,7 @@ struct DroneDefinition {
 
 enum class DroneType {
     Quadcopter,
+    Tricopter,
 };
 
 struct DroneOption {
@@ -40,3 +41,4 @@ std::span<const DroneOption> GetAvailableDroneOptions();
 std::optional<DroneType> FindAvailableDroneType(std::string_view command_name);
 DroneDefinition CreateDroneDefinition(DroneType type);
 DroneDefinition CreateQuadcopterDefinition();
+DroneDefinition CreateTricopterDefinition();

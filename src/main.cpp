@@ -105,7 +105,15 @@ int main(int argument_count, char **arguments) {
         const DroneType drone_type =
             options.selected_drone.value_or(DefaultDroneType);
         Simulation simulation(CreateDroneDefinition(drone_type));
-        return simulation.RunSmokeTest();
+        int smoke_test_result = simulation.RunSmokeTest();
+        if (smoke_test_result == EXIT_SUCCESS
+            && drone_type == DroneType::Quadcopter) {
+            smoke_test_result = simulation.RunQuadcopterControlSmokeTest();
+        }
+        if (smoke_test_result == EXIT_SUCCESS) {
+            std::printf("Simulation smoke test passed\n");
+        }
+        return smoke_test_result;
     }
     return RunInteractiveApplication(options.selected_drone);
 }

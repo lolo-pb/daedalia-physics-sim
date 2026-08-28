@@ -4,8 +4,9 @@
 
 namespace {
 
-constexpr std::array<DroneOption, 1> AvailableDroneOptions{{
+constexpr std::array<DroneOption, 2> AvailableDroneOptions{{
     {DroneType::Quadcopter, "quadcopter", "Quadcopter"},
+    {DroneType::Tricopter, "tricopter", "Tricopter"},
 }};
 
 } // namespace
@@ -28,21 +29,8 @@ DroneDefinition CreateDroneDefinition(DroneType type) {
     switch (type) {
     case DroneType::Quadcopter:
         return CreateQuadcopterDefinition();
+    case DroneType::Tricopter:
+        return CreateTricopterDefinition();
     }
     return CreateQuadcopterDefinition();
-}
-
-DroneDefinition CreateQuadcopterDefinition() {
-    return {
-        JPH::Vec3(0.25f, 0.08f, 0.25f),
-        1.0f,
-        JPH::RVec3(0.0, 1.0, 0.0),
-        JPH::Quat::sIdentity(),
-        {
-            {JPH::Vec3(-0.2f, 0.08f, -0.2f), JPH::Vec3(0.0f, 1.0f, 0.0f), JPH::Vec3(0.0f, 1.0f, 0.0f), 1000.0f, 5.0e-6f, 2.0e-8f},
-            {JPH::Vec3( 0.2f, 0.08f, -0.2f), JPH::Vec3(0.0f, 1.0f, 0.0f), JPH::Vec3(0.0f,-1.0f, 0.0f), 1000.0f, 5.0e-6f, 2.0e-8f},
-            {JPH::Vec3( 0.2f, 0.08f,  0.2f), JPH::Vec3(0.0f, 1.0f, 0.0f), JPH::Vec3(0.0f, 1.0f, 0.0f), 1000.0f, 5.0e-6f, 2.0e-8f},
-            {JPH::Vec3(-0.2f, 0.08f,  0.2f), JPH::Vec3(0.0f, 1.0f, 0.0f), JPH::Vec3(0.0f,-1.0f, 0.0f), 1000.0f, 5.0e-6f, 2.0e-8f},
-        },
-    };
 }

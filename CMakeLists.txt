@@ -90,6 +90,8 @@ add_executable(daedalia
     src/main.cpp
     src/drones/drone.cpp
     src/drones/drone_definition.cpp
+    src/drones/quadcopter.cpp
+    src/drones/tricopter.cpp
     src/sensors/ideal_barometer.cpp
     src/sensors/ideal_gps.cpp
     src/sensors/ideal_imu.cpp
@@ -103,7 +105,11 @@ target_link_libraries(daedalia PRIVATE controller SDL3::SDL3 Jolt glm::glm glad 
 
 if(BUILD_TESTING)
     add_test(
-        NAME simulation_smoke_test
+        NAME quadcopter_smoke_test
         COMMAND daedalia --smoke-test --drone quadcopter
+    )
+    add_test(
+        NAME tricopter_smoke_test
+        COMMAND daedalia --smoke-test --drone tricopter
     )
 endif()

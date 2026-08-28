@@ -49,6 +49,7 @@ public:
     void Reset();
 
     int RunSmokeTest();
+    int RunQuadcopterControlSmokeTest();
 
     FlightController GetActiveController() const;
     float GetActiveControllerThrottle() const;
