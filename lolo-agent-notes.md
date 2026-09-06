@@ -66,9 +66,9 @@ This keeps controllers independent from aircraft definitions. A controller may b
 ## Controller organization
 
 - Selectable flight modes that own user controls and motor mixing use `_controller` names.
-- Reusable control utilities are named by their function without `_controller`, such as `pid` and `attitude`.
-- `pid` owns generic PID state and limits. `attitude` estimates orientation and converts attitude setpoints into pitch, roll, and yaw corrections.
-- Motor mixing stays in the airframe-specific flight controller because motor indices and geometry belong to the aircraft layout.
+- Reusable control utilities are named by their function without `_controller`; `pid` owns only generic PID calculation, state, and limits.
+- Each flight controller owns its sensor selection and fusion, attitude estimates, PID instances and tuning, setpoints, and motor mixing.
+- Motor mixing stays controller-specific because motor indices and geometry belong to the aircraft layout.
 
 ## Flow
 

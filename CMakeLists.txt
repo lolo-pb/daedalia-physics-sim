@@ -70,7 +70,6 @@ find_package(OpenGL REQUIRED)
 
 add_library(controller STATIC
     src/controllers/angle_mode_controller.cpp
-    src/controllers/attitude.cpp
     src/controllers/demo_controller.cpp
     src/controllers/horizon_mode_controller.cpp
     src/controllers/pid.cpp
