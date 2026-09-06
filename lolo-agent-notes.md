@@ -30,7 +30,7 @@ Ground-truth position, attitude, and velocity stay inside the simulation and deb
 
 `DroneDefinition` is a blueprint. It contains the body box size, mass, starting pose, and a variable-length list of motors. Each motor definition provides its local position, thrust direction, reaction-torque direction, maximum speed, and force coefficients.
 
-`CreateQuadcopterDefinition()` currently supplies the only aircraft layout. The generic runtime `Drone` consumes that definition, creates the Jolt body, stores changing motor state, and applies motor forces and torques. Rendering also uses the definition's body size and the runtime motor-position list, so it does not assume four motors.
+`CreateQuadcopterDefinition()` and `CreateTricopterDefinition()` supply the current aircraft layouts. The generic runtime `Drone` consumes the selected definition, creates the Jolt body, stores changing motor state, and applies motor forces and torques. Rendering also uses the definition's body size and the runtime motor-position list, so it does not assume a fixed motor count.
 
 Current quad motor indices are:
 
@@ -42,6 +42,14 @@ Current quad motor indices are:
 ```
 
 Local `+X` is right, `+Y` is up, and `-Z` is front.
+
+Current tricopter motor indices are:
+
+```text
+0 front-left
+1 front-right
+2 rear
+```
 
 ## Controller command boundary
 
@@ -55,6 +63,13 @@ Local `+X` is right, `+Y` is up, and `-Z` is front.
 
 This keeps controllers independent from aircraft definitions. A controller may be physically unsuitable for a layout, but mismatched motor commands remain safe.
 
+## Controller organization
+
+- Selectable flight modes that own user controls and motor mixing use `_controller` names.
+- Reusable control utilities are named by their function without `_controller`; `pid` owns only generic PID calculation, state, and limits.
+- Each flight controller owns its sensor selection and fusion, attitude estimates, PID instances and tuning, setpoints, and motor mixing.
+- Motor mixing stays controller-specific because motor indices and geometry belong to the aircraft layout.
+
 ## Flow
 
 Startup:
@@ -62,9 +77,10 @@ Startup:
 ```text
 main
   -> initialize Jolt runtime
+  -> select an aircraft or use the command-line choice
   -> construct Simulation
        -> create physics world and floor
-       -> create quadcopter definition
+       -> create the selected drone definition
        -> create generic Drone from definition
        -> size motor command buffer from the drone
        -> create sensors and controllers
@@ -91,8 +107,7 @@ Switching controllers resets the newly selected stateful controller but leaves t
 
 ## Future work
 
-- Add a startup aircraft-selection menu.
-- Add a simple three-fixed-motor tricopter definition to expose unbalanced reaction torque.
-- Move individual aircraft definitions into clearly named files such as `quadcopter.cpp` and `tricopter.cpp` when the second layout is added.
+- <Important!> thers a rotational bug, where pitching while yawing offsets the target attitude.
+
 - Tune and validate the controllers against the quadcopter.
 - Add more layouts, saved scenarios, and experimental sensor or force models.

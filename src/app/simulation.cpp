@@ -24,6 +24,7 @@
 #include "controllers/demo_controller.hpp"
 #include "controllers/horizon_mode_controller.hpp"
 #include "controllers/position_hold_controller.hpp"
+#include "controllers/tricopter_angle_mode_controller.hpp"
 #include "drones/drone.hpp"
 #include "drones/drone_definition.hpp"
 #include "sensors/ideal_barometer.hpp"
@@ -191,6 +192,7 @@ struct Simulation::Impl {
     AngleModeController angle_mode_controller;
     HorizonModeController horizon_mode_controller;
     PositionHoldController position_hold_controller;
+    TricopterAngleModeController tricopter_angle_mode_controller;
     FlightController active_controller = FlightController::Demo;
     std::array<float, 3> gravity{0.0f, -9.81f, 0.0f};
     int physics_frequency_hz = 30;
@@ -335,6 +337,9 @@ void Simulation::SelectController(int slot) {
         impl_->horizon_mode_controller.Reset();
     } else if (impl_->active_controller == FlightController::PositionHold) {
         impl_->position_hold_controller.Reset();
+    } else if (
+        impl_->active_controller == FlightController::TricopterAngleMode) {
+        impl_->tricopter_angle_mode_controller.Reset();
     }
 }
 
@@ -360,6 +365,10 @@ void Simulation::Step(const ControllerKeys &controller_keys) {
     } else if (impl_->active_controller == FlightController::PositionHold) {
         impl_->position_hold_controller.Update(
             controller_input, impl_->motor_commands);
+    } else if (
+        impl_->active_controller == FlightController::TricopterAngleMode) {
+        impl_->tricopter_angle_mode_controller.Update(
+            controller_input, impl_->motor_commands);
     }
     impl_->drone.SetMotorTargets(impl_->motor_commands);
     impl_->drone.UpdateMotors();
@@ -380,6 +389,7 @@ void Simulation::Reset() {
     impl_->angle_mode_controller.Reset();
     impl_->horizon_mode_controller.Reset();
     impl_->position_hold_controller.Reset();
+    impl_->tricopter_angle_mode_controller.Reset();
 }
 
 int Simulation::RunSmokeTest() {
@@ -507,6 +517,9 @@ FlightController Simulation::GetActiveController() const {
 float Simulation::GetActiveControllerThrottle() const {
     if (impl_->active_controller == FlightController::HorizonMode) {
         return impl_->horizon_mode_controller.GetThrottle();
+    }
+    if (impl_->active_controller == FlightController::TricopterAngleMode) {
+        return impl_->tricopter_angle_mode_controller.GetThrottle();
     }
     return impl_->angle_mode_controller.GetThrottle();
 }
