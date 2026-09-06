@@ -37,8 +37,6 @@ constexpr float AltitudeProportionalGain = 0.08f;
 constexpr float AltitudeIntegralGain = 0.02f;
 constexpr float AltitudeVelocityGain = 0.06f;
 constexpr float AltitudeIntegralLimit = 2.0f;
-constexpr float AttitudeIntegralLimit = 1.0f;
-constexpr float AttitudeCorrectionLimit = 0.25f;
 constexpr float MinimumThrottle = 0.45f;
 constexpr float MaximumThrottle = 0.90f;
 constexpr float HorizontalTargetSpeedMetersPerSecond = 1.0f;
@@ -49,15 +47,23 @@ constexpr std::size_t FrontRightMotor = 1;
 constexpr std::size_t RearRightMotor = 2;
 constexpr std::size_t RearLeftMotor = 3;
 
-struct PidGains {
-    float proportional;
-    float integral;
-    float derivative;
+constexpr PidConfig PitchPidConfig{
+    1.0f, 0.0f, 0.1f,
+    -1.0f, 1.0f,
+    -0.25f, 0.25f,
 };
+constexpr PidConfig RollPidConfig = PitchPidConfig;
+constexpr PidConfig YawPidConfig = PitchPidConfig;
 
-constexpr PidGains PitchGains{1.0f, 0.0f, 0.1f};
-constexpr PidGains RollGains{1.0f, 0.0f, 0.1f};
-constexpr PidGains YawGains{1.0f, 0.0f, 0.1f};
+constexpr PidConfig AltitudePidConfig{
+    AltitudeProportionalGain,
+    AltitudeIntegralGain,
+    AltitudeVelocityGain,
+    -AltitudeIntegralLimit,
+    AltitudeIntegralLimit,
+    MinimumThrottle - HoverThrottle,
+    MaximumThrottle - HoverThrottle,
+};
 
 float KeyAxis(bool positive, bool negative) {
     return static_cast<float>(positive) - static_cast<float>(negative);
@@ -76,24 +82,6 @@ float BlendAngle(float gyro_angle, float measured_angle) {
 float MagneticHeading(const MagnetometerSample &magnetometer) {
     const SensorVector3 &field = magnetometer.body_magnetic_field_microteslas;
     return std::atan2(field.x, -field.z);
-}
-
-float UpdatePid(
-    float error,
-    float measured_rate,
-    float timestep,
-    const PidGains &gains,
-    float &integral) {
-    integral = std::clamp(
-        integral + error * timestep,
-        -AttitudeIntegralLimit,
-        AttitudeIntegralLimit);
-    return std::clamp(
-        gains.proportional * error
-            + gains.integral * integral
-            - gains.derivative * measured_rate,
-        -AttitudeCorrectionLimit,
-        AttitudeCorrectionLimit);
 }
 
 void MixMotorTargets(
@@ -118,6 +106,12 @@ void MixMotorTargets(
 
 } // namespace
 
+PositionHoldController::PositionHoldController() :
+    pitch_pid_(PitchPidConfig),
+    roll_pid_(RollPidConfig),
+    yaw_pid_(YawPidConfig),
+    altitude_pid_(AltitudePidConfig) {}
+
 void PositionHoldController::Reset() {
     target_world_x_meters_ = 0.0f;
     target_world_z_meters_ = 0.0f;
@@ -126,10 +120,10 @@ void PositionHoldController::Reset() {
     pitch_rad_ = 0.0f;
     roll_rad_ = 0.0f;
     yaw_rad_ = 0.0f;
-    pitch_integral_ = 0.0f;
-    roll_integral_ = 0.0f;
-    yaw_integral_ = 0.0f;
-    altitude_integral_ = 0.0f;
+    pitch_pid_.Reset();
+    roll_pid_.Reset();
+    yaw_pid_.Reset();
+    altitude_pid_.Reset();
     target_initialized_ = false;
 }
 
@@ -211,37 +205,17 @@ void PositionHoldController::Update(
     const float altitude =
         BarometricAltitudeMeters(input.barometer.pressure_pascals);
     const float altitude_error = target_altitude_meters_ - altitude;
-    altitude_integral_ = std::clamp(
-        altitude_integral_ + altitude_error * timestep,
-        -AltitudeIntegralLimit,
-        AltitudeIntegralLimit);
-    const float throttle = std::clamp(
-        HoverThrottle
-            + AltitudeProportionalGain * altitude_error
-            + AltitudeIntegralGain * altitude_integral_
-            - AltitudeVelocityGain * gps.world_velocity_meters_per_second.y,
-        MinimumThrottle,
-        MaximumThrottle);
-
+    const float throttle = HoverThrottle + altitude_pid_.Update(
+        altitude_error,
+        gps.world_velocity_meters_per_second.y,
+        timestep);
     const SensorVector3 &gyro = input.imu.body_gyro_rad_per_second;
-    const float pitch_correction = UpdatePid(
-        WrapAngle(desired_pitch - pitch_rad_),
-        gyro.x,
-        timestep,
-        PitchGains,
-        pitch_integral_);
-    const float roll_correction = UpdatePid(
-        WrapAngle(desired_roll - roll_rad_),
-        gyro.z,
-        timestep,
-        RollGains,
-        roll_integral_);
-    const float yaw_correction = UpdatePid(
-        WrapAngle(target_heading_rad_ - yaw_rad_),
-        gyro.y,
-        timestep,
-        YawGains,
-        yaw_integral_);
+    const float pitch_correction = pitch_pid_.Update(
+        WrapAngle(desired_pitch - pitch_rad_), gyro.x, timestep);
+    const float roll_correction = roll_pid_.Update(
+        WrapAngle(desired_roll - roll_rad_), gyro.z, timestep);
+    const float yaw_correction = yaw_pid_.Update(
+        WrapAngle(target_heading_rad_ - yaw_rad_), gyro.y, timestep);
     MixMotorTargets(
         motor_commands,
         throttle,
