@@ -2,6 +2,7 @@
 
 #include "controllers/controller_io.hpp"
 #include "controllers/pid.hpp"
+#include "controllers/quaternion.hpp"
 
 class TricopterAngleModeController {
 public:
@@ -17,8 +18,7 @@ private:
 
     Pid pitch_pid_;
     Pid roll_pid_;
-    float pitch_rad_ = 0.0f;
-    float roll_rad_ = 0.0f;
+    Quaternion orientation_;
     float throttle_ = 0.572f;
     bool attitude_initialized_ = false;
 };

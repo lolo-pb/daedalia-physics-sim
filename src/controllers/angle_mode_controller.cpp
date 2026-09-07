@@ -12,8 +12,8 @@ constexpr float TiltRadians = 10.0f * Pi / 180.0f;
 constexpr float YawRateRadiansPerSecond = 45.0f * Pi / 180.0f;
 constexpr float ThrottleRatePerSecond = 0.25f;
 constexpr float HoverThrottle = 0.70f;
-constexpr float ComplementaryGyroWeight = 0.98f;
 constexpr float MinimumAccelerationSquared = 1.0e-6f;
+constexpr SensorVector3 WorldUp{0.0f, 1.0f, 0.0f};
 constexpr std::size_t FrontLeftMotor = 0;
 constexpr std::size_t FrontRightMotor = 1;
 constexpr std::size_t RearRightMotor = 2;
@@ -31,9 +31,19 @@ float KeyAxis(bool positive, bool negative) {
 
 float WrapAngle(float angle) { return std::remainder(angle, TwoPi); }
 
-float BlendAngle(float gyro_angle, float accelerometer_angle) {
-  const float correction = WrapAngle(accelerometer_angle - gyro_angle);
-  return WrapAngle(gyro_angle + (1.0f - ComplementaryGyroWeight) * correction);
+SensorVector3 ScaleVector(const SensorVector3 &vector, float scale) {
+  return {vector.x * scale, vector.y * scale, vector.z * scale};
+}
+
+Quaternion BuildTargetOrientation(float pitch, float roll, float yaw) {
+  const Quaternion pitch_rotation =
+      QuaternionFromRotationVector({pitch, 0.0f, 0.0f});
+  const Quaternion roll_rotation =
+      QuaternionFromRotationVector({0.0f, 0.0f, roll});
+  const Quaternion yaw_rotation =
+      QuaternionFromRotationVector({0.0f, yaw, 0.0f});
+  return MultiplyQuaternions(
+      yaw_rotation, MultiplyQuaternions(pitch_rotation, roll_rotation));
 }
 
 void MixMotorTargets(MotorCommands &motor_commands, float throttle,
@@ -60,9 +70,7 @@ void AngleModeController::Reset() {
   pitch_pid_.Reset();
   roll_pid_.Reset();
   yaw_pid_.Reset();
-  pitch_rad_ = 0.0f;
-  roll_rad_ = 0.0f;
-  yaw_rad_ = 0.0f;
+  orientation_ = {};
   target_yaw_rad_ = 0.0f;
   throttle_ = HoverThrottle;
   attitude_initialized_ = false;
@@ -85,15 +93,19 @@ void AngleModeController::Update(const ControllerInput &input,
 
   UpdateAttitudeEstimate(input.imu, timestep);
   const SensorVector3 &gyro = input.imu.body_gyro_rad_per_second;
-  const float pitch_correction = pitch_pid_.Update(
-      WrapAngle(target_pitch_rad - pitch_rad_), gyro.x, timestep);
-
-  const float roll_correction = roll_pid_.Update(
-      WrapAngle(target_roll_rad - roll_rad_), gyro.z, timestep);
-
+  const Quaternion target_orientation = BuildTargetOrientation(
+      target_pitch_rad, target_roll_rad, target_yaw_rad_);
+  const Quaternion orientation_error = MultiplyQuaternions(
+      ConjugateQuaternion(orientation_), target_orientation);
+  const SensorVector3 rotation_error =
+      QuaternionToRotationVector(orientation_error);
+  const float pitch_correction =
+      pitch_pid_.Update(rotation_error.x, gyro.x, timestep);
+  const float roll_correction =
+      roll_pid_.Update(rotation_error.z, gyro.z, timestep);
   const float yaw_correction =
-      yaw_pid_.Update(WrapAngle(target_yaw_rad_ - yaw_rad_), gyro.y, timestep);
-  
+      yaw_pid_.Update(rotation_error.y, gyro.y, timestep);
+
   MixMotorTargets(motor_commands, throttle_, pitch_correction, roll_correction,
                   yaw_correction);
 }
@@ -108,25 +120,20 @@ void AngleModeController::UpdateAttitudeEstimate(const ImuSample &imu,
   const float acceleration_squared = acceleration.x * acceleration.x +
                                      acceleration.y * acceleration.y +
                                      acceleration.z * acceleration.z;
-  const bool has_accelerometer_attitude =
-      acceleration_squared > MinimumAccelerationSquared;
-  const float accelerometer_pitch = std::atan2(-acceleration.z, acceleration.y);
-  const float accelerometer_roll = std::atan2(acceleration.x, acceleration.y);
+  const bool has_accelerometer_attitude = acceleration_squared >
+                                          MinimumAccelerationSquared;
+  const SensorVector3 measured_up = NormalizeVector(acceleration);
 
   if (!attitude_initialized_) {
     if (has_accelerometer_attitude) {
-      pitch_rad_ = accelerometer_pitch;
-      roll_rad_ = accelerometer_roll;
+      orientation_ = QuaternionFromTwoUnitVectors(measured_up, WorldUp);
     }
     attitude_initialized_ = true;
     return;
   }
 
-  pitch_rad_ = WrapAngle(pitch_rad_ + gyro.x * timestep);
-  roll_rad_ = WrapAngle(roll_rad_ + gyro.z * timestep);
-  yaw_rad_ = WrapAngle(yaw_rad_ + gyro.y * timestep);
-  if (has_accelerometer_attitude) {
-    pitch_rad_ = BlendAngle(pitch_rad_, accelerometer_pitch);
-    roll_rad_ = BlendAngle(roll_rad_, accelerometer_roll);
-  }
+  const Quaternion gyro_rotation = QuaternionFromRotationVector(
+      ScaleVector(gyro, timestep));
+  orientation_ = NormalizeQuaternion(
+      MultiplyQuaternions(orientation_, gyro_rotation));
 }

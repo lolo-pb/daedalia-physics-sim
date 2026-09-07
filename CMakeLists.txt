@@ -74,6 +74,7 @@ add_library(controller STATIC
     src/controllers/horizon_mode_controller.cpp
     src/controllers/pid.cpp
     src/controllers/position_hold_controller.cpp
+    src/controllers/quaternion.cpp
     src/controllers/tricopter_angle_mode_controller.cpp
 )
 target_include_directories(controller PUBLIC
