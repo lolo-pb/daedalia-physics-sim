@@ -1,5 +1,7 @@
 #include "drones/drone.hpp"
 
+#include <cmath>
+
 #include <Jolt/Physics/Body/BodyCreationSettings.h>
 #include <Jolt/Physics/Body/BodyInterface.h>
 #include <Jolt/Physics/Collision/Shape/BoxShape.h>
@@ -53,7 +55,7 @@ void Drone::SetMotorTargets(const MotorCommands &motor_commands) {
 void Drone::UpdateMotors() {
     for (Motor &motor : motors_) {
         motor.speed_rad_per_second =
-            motor.target * motor.definition.max_speed_rad_per_second;
+            std::sqrt(motor.target) * motor.definition.max_speed_rad_per_second;
     }
 }
 
