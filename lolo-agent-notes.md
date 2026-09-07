@@ -107,7 +107,6 @@ Switching controllers resets the newly selected stateful controller but leaves t
 
 ## Future work
 
-- <Important!> thers a rotational bug, where pitching while yawing offsets the target attitude.
 
 - Tune and validate the controllers against the quadcopter.
 - Add more layouts, saved scenarios, and experimental sensor or force models.
