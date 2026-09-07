@@ -11,7 +11,7 @@ constexpr float TwoPi = 2.0f * Pi;
 constexpr float TiltRadians = 10.0f * Pi / 180.0f;
 constexpr float YawRateRadiansPerSecond = 45.0f * Pi / 180.0f;
 constexpr float ThrottleRatePerSecond = 0.25f;
-constexpr float HoverThrottle = 0.70f;
+constexpr float HoverThrottle = 0.4905f;
 constexpr float MinimumAccelerationSquared = 1.0e-6f;
 constexpr SensorVector3 WorldUp{0.0f, 1.0f, 0.0f};
 constexpr std::size_t FrontLeftMotor = 0;

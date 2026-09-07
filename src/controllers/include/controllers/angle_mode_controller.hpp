@@ -21,6 +21,6 @@ private:
     Pid yaw_pid_;
     Quaternion orientation_;
     float target_yaw_rad_ = 0.0f;
-    float throttle_ = 0.70f;
+    float throttle_ = 0.4905f;
     bool attitude_initialized_ = false;
 };

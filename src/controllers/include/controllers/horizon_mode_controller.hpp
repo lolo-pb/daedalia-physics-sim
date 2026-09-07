@@ -24,6 +24,6 @@ private:
     float target_pitch_rad_ = 0.0f;
     float target_roll_rad_ = 0.0f;
     float target_yaw_rad_ = 0.0f;
-    float throttle_ = 0.70f;
+    float throttle_ = 0.4905f;
     bool attitude_initialized_ = false;
 };
