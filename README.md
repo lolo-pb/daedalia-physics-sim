@@ -8,7 +8,11 @@ The goal is to experiment with control software against a physical vehicle model
 Jolt physics -> simulated sensors -> flight controller -> motor model -> forces and torques
 ```
 
-![Daedalia Physics Sim running](screenshots/image.png)
+
+
+https://github.com/user-attachments/assets/55fca39c-678d-4c75-8833-e4cc0290c340
+
+
 
 ## Current state
 
