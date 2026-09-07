@@ -9,6 +9,8 @@
 
 namespace {
 
+constexpr float FloorHalfExtent = 1000.0f;
+
 GLuint CompileShader(GLenum type, const char *source) {
     const GLuint shader = glCreateShader(type);
     if (shader == 0) {
@@ -38,19 +40,37 @@ GLuint CreateProgram() {
         uniform mat4 model;
         uniform mat4 view_projection;
         out vec3 world_normal;
+        out vec3 world_position;
         void main() {
             world_normal = mat3(model) * normal;
-            gl_Position = view_projection * model * vec4(position, 1.0);
+            world_position = vec3(model * vec4(position, 1.0));
+            gl_Position = view_projection * vec4(world_position, 1.0);
         }
     )";
     constexpr char fragment_source[] = R"(
         #version 450 core
         in vec3 world_normal;
+        in vec3 world_position;
         uniform vec3 colour;
+        uniform bool show_grid;
         out vec4 fragment_colour;
         void main() {
+            vec3 surface_colour = colour;
+            if (show_grid) {
+                vec2 minor_width = fwidth(world_position.xz);
+                vec2 minor_distance = abs(fract(world_position.xz - 0.5) - 0.5) / minor_width;
+                float minor_line = 1.0 - min(min(minor_distance.x, minor_distance.y), 1.0);
+
+                vec2 major_position = world_position.xz / 10.0;
+                vec2 major_width = fwidth(major_position);
+                vec2 major_distance = abs(fract(major_position - 0.5) - 0.5) / major_width;
+                float major_line = 1.0 - min(min(major_distance.x, major_distance.y), 1.0);
+
+                surface_colour = mix(surface_colour, vec3(0.16, 0.19, 0.16), minor_line * 0.55);
+                surface_colour = mix(surface_colour, vec3(0.08, 0.10, 0.08), major_line * 0.85);
+            }
             float light = max(dot(normalize(world_normal), normalize(vec3(0.4, 1.0, 0.3))), 0.0);
-            fragment_colour = vec4(colour * (0.25 + 0.75 * light), 1.0);
+            fragment_colour = vec4(surface_colour * (0.25 + 0.75 * light), 1.0);
         }
     )";
 
@@ -151,8 +171,8 @@ bool Renderer::Initialize() {
         -0.5f,-0.5f,-0.5f,-1, 0, 0, -0.5f,-0.5f, 0.5f,-1, 0, 0, -0.5f, 0.5f, 0.5f,-1, 0, 0, -0.5f,-0.5f,-0.5f,-1, 0, 0, -0.5f, 0.5f, 0.5f,-1, 0, 0, -0.5f, 0.5f,-0.5f,-1, 0, 0,
     };
     constexpr float plane_vertices[] = {
-        -10.0f, 0.0f,-10.0f, 0, 1, 0,  10.0f, 0.0f,-10.0f, 0, 1, 0,  10.0f, 0.0f, 10.0f, 0, 1, 0,
-        -10.0f, 0.0f,-10.0f, 0, 1, 0,  10.0f, 0.0f, 10.0f, 0, 1, 0, -10.0f, 0.0f, 10.0f, 0, 1, 0,
+        -FloorHalfExtent, 0.0f,-FloorHalfExtent, 0, 1, 0,  FloorHalfExtent, 0.0f,-FloorHalfExtent, 0, 1, 0,  FloorHalfExtent, 0.0f, FloorHalfExtent, 0, 1, 0,
+        -FloorHalfExtent, 0.0f,-FloorHalfExtent, 0, 1, 0,  FloorHalfExtent, 0.0f, FloorHalfExtent, 0, 1, 0, -FloorHalfExtent, 0.0f, FloorHalfExtent, 0, 1, 0,
     };
 
     cube_ = CreateMesh(cube_vertices, 36);
@@ -187,7 +207,9 @@ void Renderer::DrawScene(
     const glm::mat4 projection = glm::perspective(glm::radians(50.0f), static_cast<float>(width) / static_cast<float>(height), 0.1f, 100.0f);
     const glm::mat4 view = glm::lookAt(camera_position, camera_position + camera_forward, glm::vec3(0.0f, 1.0f, 0.0f));
     glUniformMatrix4fv(glGetUniformLocation(program_, "view_projection"), 1, GL_FALSE, glm::value_ptr(projection * view));
+    glUniform1i(glGetUniformLocation(program_, "show_grid"), GL_TRUE);
     DrawMesh(plane_, program_, glm::mat4(1.0f), glm::vec3(0.28f, 0.33f, 0.28f));
+    glUniform1i(glGetUniformLocation(program_, "show_grid"), GL_FALSE);
 
     const glm::mat4 transform = glm::translate(glm::mat4(1.0f), glm::vec3(drone.position.GetX(), drone.position.GetY(), drone.position.GetZ()))
         * glm::mat4_cast(glm::quat(drone.rotation.GetW(), drone.rotation.GetX(), drone.rotation.GetY(), drone.rotation.GetZ()));

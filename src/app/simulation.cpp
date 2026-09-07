@@ -34,6 +34,8 @@
 
 namespace {
 
+constexpr float FloorHalfExtent = 1000.0f;
+
 namespace Layers {
 constexpr JPH::ObjectLayer Static = 0;
 constexpr JPH::ObjectLayer Moving = 1;
@@ -169,7 +171,7 @@ struct PhysicsWorld {
 
         JPH::BodyInterface &bodies = physics.GetBodyInterface();
         const JPH::BodyCreationSettings floor_settings(
-            new JPH::BoxShape(JPH::Vec3(10.0f, 0.5f, 10.0f)),
+            new JPH::BoxShape(JPH::Vec3(FloorHalfExtent, 0.5f, FloorHalfExtent)),
             JPH::RVec3(0.0, -0.5, 0.0),
             JPH::Quat::sIdentity(),
             JPH::EMotionType::Static,
