@@ -2,6 +2,13 @@
 
 Daedalia is a native C++ flight-physics test bed. SDL owns the window and OpenGL context, Jolt advances rigid-body physics, ImGui provides debug controls, and the renderer draws the latest simulated state.
 
+## Currently
+
+  as of rn im buiding the triangular bypyramid drone
+  its here the geometry is ugly af but its cool, the torque directions need to be checked and it needs a controller
+
+#
+
 Build and run:
 
 ```sh
