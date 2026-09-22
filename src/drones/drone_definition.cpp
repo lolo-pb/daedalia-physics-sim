@@ -31,6 +31,8 @@ DroneDefinition CreateDroneDefinition(DroneType type) {
         return CreateQuadcopterDefinition();
     case DroneType::Tricopter:
         return CreateTricopterDefinition();
-    }
+    case DrineType::TriangularBipyramidCopter:
+        return CreateTriangularBipyramidCopter();
+    } 
     return CreateQuadcopterDefinition();
 }
