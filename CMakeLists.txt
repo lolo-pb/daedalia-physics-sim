@@ -94,6 +94,7 @@ add_executable(daedalia
     src/drones/drone_definition.cpp
     src/drones/quadcopter.cpp
     src/drones/tricopter.cpp
+    src/drones/triangular-bipyramid-copter.cpp
     src/sensors/ideal_barometer.cpp
     src/sensors/ideal_gps.cpp
     src/sensors/ideal_imu.cpp

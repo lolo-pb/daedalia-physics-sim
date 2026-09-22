@@ -4,9 +4,10 @@
 
 namespace {
 
-constexpr std::array<DroneOption, 2> AvailableDroneOptions{{
+constexpr std::array<DroneOption, 3> AvailableDroneOptions{{
     {DroneType::Quadcopter, "quadcopter", "Quadcopter"},
     {DroneType::Tricopter, "tricopter", "Tricopter"},
+    {DroneType::TriangularBipyramidCopter, "triangular-bipyramid-copter", "Triangular Bipyramid"},
 }};
 
 } // namespace
@@ -31,8 +32,8 @@ DroneDefinition CreateDroneDefinition(DroneType type) {
         return CreateQuadcopterDefinition();
     case DroneType::Tricopter:
         return CreateTricopterDefinition();
-    case DrineType::TriangularBipyramidCopter:
-        return CreateTriangularBipyramidCopter();
-    } 
+    case DroneType::TriangularBipyramidCopter:
+        return CreateTriangularBipyramidCopterDefinition();
+    }
     return CreateQuadcopterDefinition();
 }

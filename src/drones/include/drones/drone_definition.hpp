@@ -27,6 +27,7 @@ struct DroneDefinition {
 enum class DroneType {
     Quadcopter,
     Tricopter,
+    TriangularBipyramidCopter,
 };
 
 struct DroneOption {
@@ -42,3 +43,4 @@ std::optional<DroneType> FindAvailableDroneType(std::string_view command_name);
 DroneDefinition CreateDroneDefinition(DroneType type);
 DroneDefinition CreateQuadcopterDefinition();
 DroneDefinition CreateTricopterDefinition();
+DroneDefinition CreateTriangularBipyramidCopterDefinition();
