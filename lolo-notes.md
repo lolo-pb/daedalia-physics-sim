@@ -114,6 +114,12 @@ Switching controllers resets the newly selected stateful controller but leaves t
 
 ## Future work
 
+- Freeform visual geometry
 
-- Tune and validate the controllers against the quadcopter.
-- Add more layouts, saved scenarios, and experimental sensor or force models.
+- Change coliisions to spheres
+
+- Physics migration to Nexus GPU. It works without NVIDIA, but it is Rust and still new. 
+
+- Tune quadcopter controller.
+- Add sensor noise.
+- Add map geometry.
