@@ -42,3 +42,34 @@ void TBCController::UpdateAttitudeEstimate(const ImuSample &imu, float timestep)
 
 	orientation_ = NormalizeQuaternion(MultiplyQuaternions(orientation_, gyro_rotation));
 }
+
+/* // lolo section //
+
+aparently the projection formula is
+
+ ( (A.B)/(|B|^2) ) * B
+
+ a, B vectors
+ y A.B es la proyeccion por |B|
+ y el versor de B es B/|B|
+ entonces
+
+ (A.B)/|B| por el versor de B
+
+
+
+GPT quiere hacer:
+You chose:
+
+motor_target_i = scale × p_i
+
+where `p_i` is how upward-facing that motor is.
+But that motor’s thrust is tilted, so only a fraction `p_i` of its thrust goes upward:
+
+vertical_lift_i = motor_target_i × p_i
+
+Substitute your motor target rule:
+
+vertical_lift_i = ( (scale × p_i) × p_i ) = ( scale × p_i² )
+
+*/
