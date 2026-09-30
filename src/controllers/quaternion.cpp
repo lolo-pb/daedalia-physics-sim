@@ -7,10 +7,12 @@ namespace {
 
 constexpr float MinimumLengthSquared = 1.0e-12f;
 
+// Returns how much two vectors point in the same direction.
 float Dot(const SensorVector3 &left, const SensorVector3 &right) {
     return left.x * right.x + left.y * right.y + left.z * right.z;
 }
 
+// Returns a vector perpendicular to both input vectors.
 SensorVector3 Cross(const SensorVector3 &left, const SensorVector3 &right) {
     return {
         left.y * right.z - left.z * right.y,
@@ -19,6 +21,7 @@ SensorVector3 Cross(const SensorVector3 &left, const SensorVector3 &right) {
     };
 }
 
+// Returns the squared length without calculating a square root.
 float LengthSquared(const SensorVector3 &vector) { return Dot(vector, vector); }
 
 } // namespace
