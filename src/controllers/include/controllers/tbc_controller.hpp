@@ -6,11 +6,13 @@
 
 class TBCController {
 public:
-  TBCController();
-  void Reset();
-  void Update(const ControllerInput &input, MotorCommands &motor_commands);
+	TBCController();
+	void Reset();
+	void Update(const ControllerInput &input, MotorCommands &motor_commands);
 
 private:
-  Quaternion orientation;
-  bool initialized;
-}
+	Quaternion orientation_;
+	bool initialized_ = false;
+
+	void UpdateAttitudeEstimate(const ImuSample &imu, float timestep);
+};
