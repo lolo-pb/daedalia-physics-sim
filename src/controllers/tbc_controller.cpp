@@ -5,16 +5,16 @@
 
 namespace {
 
-constexpr float HoverThrottle = 1.0f; // TODO this needs checking
+constexpr float HoverThrottle = 0.197f; // TODO this needs checking
 
 constexpr SensorVector3 WorldUp{0.0f, 1.0f, 0.0f};
 constexpr vec3f MotorLocalNormals[6] = {
-		{0.4714, 0.8165, 0.3333},		// Upper face 1
-		{-0.9426, 0.0000, 0.3338},	// Upper face 2
-		{0.4714, -0.8165, 0.3333},	// Upper face 3
-		{0.4714, 0.8165, -0.3333},	// Lower face 1
+		{0.4714, 0.8165, 0.3333}, // Upper face 1
+		{-0.9426, 0.0000, 0.3338}, // Upper face 2
+		{0.4714, -0.8165, 0.3333}, // Upper face 3
+		{0.4714, 0.8165, -0.3333}, // Lower face 1
 		{-0.9426, 0.0000, -0.3338}, // Lower face 2
-		{0.4714, -0.8165, -0.3333}	// Lower face 3
+		{0.4714, -0.8165, -0.3333} // Lower face 3
 };
 vec3f motorWorldNormals[6]{};
 
@@ -46,8 +46,9 @@ void TBCController::Update(const ControllerInput &input, MotorCommands &motor_co
 		sumy += yComponent > 0 ? yComponent : 0;
 	}
 	for (int i = 0; i < 6; i++) {
-		if (motorWorldNormals[i].y) {
-			motor_commands.SetMotor(i, (motorWorldNormals[i].y / sumy) * HoverThrottle);
+		if (motorWorldNormals[i].y > 0 && sumy != 0) {
+			//motor_commands.SetMotor(i, (motorWorldNormals[i].y / sumy) * HoverThrottle);
+			motor_commands.SetMotor(i, (HoverThrottle / sumy));
 		}
 	}
 
