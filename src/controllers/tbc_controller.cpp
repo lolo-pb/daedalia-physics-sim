@@ -5,7 +5,7 @@
 
 namespace {
 
-constexpr float HoverThrottle = 0.7f; // TODO this needs checking
+constexpr float HoverThrottle = 1.0f; // TODO this needs checking
 
 constexpr SensorVector3 WorldUp{0.0f, 1.0f, 0.0f};
 constexpr vec3f MotorLocalPositions[6] = {

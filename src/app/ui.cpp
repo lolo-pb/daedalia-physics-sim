@@ -34,6 +34,9 @@ PhysicsPanelResult DrawPhysicsPanel(
     if (ImGui::RadioButton("5 Tricopter Angle", simulation.GetActiveController() == FlightController::TricopterAngleMode)) {
         simulation.SelectController(5);
     }
+    if (ImGui::RadioButton("6 TBC", simulation.GetActiveController() == FlightController::TBC)) {
+        simulation.SelectController(6);
+    }
     if (simulation.GetActiveController() == FlightController::Demo) {
         ImGui::TextUnformatted("X arm/disarm motors");
     }
@@ -56,6 +59,9 @@ PhysicsPanelResult DrawPhysicsPanel(
         ImGui::TextUnformatted("W/S pitch, A/D roll, R/F throttle");
         ImGui::TextUnformatted("Yaw is unsupported by the current tricopter");
         ImGui::TextUnformatted("Hold right mouse for camera controls");
+    }
+    if (simulation.GetActiveController() == FlightController::TBC) {
+        ImGui::TextUnformatted("Testing upward-thrust allocation");
     }
 
     ImGui::SeparatorText("Simulation");

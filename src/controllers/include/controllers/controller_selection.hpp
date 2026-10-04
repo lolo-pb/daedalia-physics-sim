@@ -6,6 +6,7 @@ enum class FlightController {
     HorizonMode,
     PositionHold,
     TricopterAngleMode,
+    TBC,
 };
 
 inline bool SelectControllerSlot(int slot, FlightController &active_controller) {
@@ -24,6 +25,9 @@ inline bool SelectControllerSlot(int slot, FlightController &active_controller) 
         return true;
     case 5:
         active_controller = FlightController::TricopterAngleMode;
+        return true;
+    case 6:
+        active_controller = FlightController::TBC;
         return true;
     default:
         return false;
