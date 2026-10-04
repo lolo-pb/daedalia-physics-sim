@@ -45,7 +45,7 @@ void TBCController::Update(const ControllerInput &input, MotorCommands &motor_co
 		sumy += motorWorldPositions[i].y;
 	}
 	for (int i = 0; i < 6; i++) {
-		motorThrusts[i] = (motorWorldPositions[i].y / sumy) * HoverThrottle;
+		motor_commands.SetMotor(i, (motorWorldPositions[i].y / sumy) * HoverThrottle)
 	}
 
 	/// THRUST UP /////
