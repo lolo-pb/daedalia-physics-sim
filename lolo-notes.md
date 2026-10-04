@@ -125,7 +125,8 @@ Switching controllers resets the newly selected stateful controller but leaves t
 - Add map geometry.
 
 
-- Add pid altitude controll for TBC
+- Add altitude control with altimeter for TBC
+- Add position hold with GPS for TBC
 
 - 4x 4rotor drone for 0 G
 
