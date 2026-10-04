@@ -42,10 +42,13 @@ void TBCController::Update(const ControllerInput &input, MotorCommands &motor_co
 	// We asign a thrust based on huw much vertically that motro norlam contributes
 	for (int i = 0; i < 6; i++) {
 		motorWorldPositions[i] = RotateVector(orientation_, MotorLocalPositions[i]);
-		sumy += motorWorldPositions[i].y;
+		float yComponent = motorWorldPositions[i].y;
+		sumy += yComponent > 0 ? yComponent : 0;
 	}
 	for (int i = 0; i < 6; i++) {
-		motor_commands.SetMotor(i, (motorWorldPositions[i].y / sumy) * HoverThrottle)
+		if (motorWorldPositions[i].y) {
+			motor_commands.SetMotor(i, (motorWorldPositions[i].y / sumy) * HoverThrottle);
+		}
 	}
 
 	/// THRUST UP /////
