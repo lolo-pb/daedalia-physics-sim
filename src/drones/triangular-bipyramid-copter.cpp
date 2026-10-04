@@ -4,10 +4,11 @@ DroneDefinition CreateTriangularBipyramidCopterDefinition() {
 	return {
 			// JPH::Vec3(0.577, 0.50, 0.816), // half extent, box that holds the
 			JPH::Vec3(0.096, 0.167, 0.272),
-			1.0f,																																		 // wheight
-			JPH::RVec3(0.0, 1.0, 0.0),																							 // start pos
-			JPH::Quat::sRotation(JPH::Vec3::sAxisX(), JPH::DegreesToRadians(90.0f)), // start rPot
-			{																																				 // list of motors
+			1.0f,											 // wheight
+			JPH::RVec3(0.0, 1.0, 0.0), // start pos
+			JPH::Quat::sIdentity(),
+			// JPH::Quat::sRotation(JPH::Vec3::sAxisX(), JPH::DegreesToRadians(90.0f)), // start rPot
+			{// list of motors
 			 //{JPH::Vec3(-0.2165f, 0.08f, -0.125f),  // local position
 			 // JPH::Vec3(0.0f, 1.0f, 0.0f),          // local thrust direction
 			 // JPH::Vec3(0.0f, 1.0f, 0.0f),          // local reaction torque direction

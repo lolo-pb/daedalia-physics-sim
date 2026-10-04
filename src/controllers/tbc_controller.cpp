@@ -8,15 +8,15 @@ namespace {
 constexpr float HoverThrottle = 1.0f; // TODO this needs checking
 
 constexpr SensorVector3 WorldUp{0.0f, 1.0f, 0.0f};
-constexpr vec3f MotorLocalPositions[6] = {
-		{0.096f, 0.167f, 0.272f},		// Upper face 1
-		{-0.192f, 0.000f, 0.272f},	// Upper face 2
-		{0.096f, -0.167f, 0.272f},	// Upper face 3
-		{0.096f, 0.167f, -0.272f},	// Lower face 1
-		{-0.192f, 0.000f, -0.272f}, // Lower face 2
-		{0.096f, -0.167f, -0.272f}, // Lower face 3
+constexpr vec3f MotorLocalNormals[6] = {
+		{0.4714, 0.8165, 0.3333},		// Upper face 1
+		{-0.9426, 0.0000, 0.3338},	// Upper face 2
+		{0.4714, -0.8165, 0.3333},	// Upper face 3
+		{0.4714, 0.8165, -0.3333},	// Lower face 1
+		{-0.9426, 0.0000, -0.3338}, // Lower face 2
+		{0.4714, -0.8165, -0.3333}	// Lower face 3
 };
-vec3f motorWorldPositions[6]{};
+vec3f motorWorldNormals[6]{};
 
 float motorThrusts[6]{};
 
@@ -41,13 +41,13 @@ void TBCController::Update(const ControllerInput &input, MotorCommands &motor_co
 
 	// We asign a thrust based on huw much vertically that motro norlam contributes
 	for (int i = 0; i < 6; i++) {
-		motorWorldPositions[i] = RotateVector(orientation_, MotorLocalPositions[i]);
-		float yComponent = motorWorldPositions[i].y;
+		motorWorldNormals[i] = RotateVector(orientation_, MotorLocalNormals[i]);
+		float yComponent = motorWorldNormals[i].y;
 		sumy += yComponent > 0 ? yComponent : 0;
 	}
 	for (int i = 0; i < 6; i++) {
-		if (motorWorldPositions[i].y) {
-			motor_commands.SetMotor(i, (motorWorldPositions[i].y / sumy) * HoverThrottle);
+		if (motorWorldNormals[i].y) {
+			motor_commands.SetMotor(i, (motorWorldNormals[i].y / sumy) * HoverThrottle);
 		}
 	}
 
