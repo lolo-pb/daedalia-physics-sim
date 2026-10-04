@@ -4,7 +4,7 @@ DroneDefinition CreateTriangularBipyramidCopterDefinition() {
 	return {
 			// JPH::Vec3(0.577, 0.50, 0.816), // half extent, box that holds the
 			JPH::Vec3(0.096, 0.167, 0.272),
-			0.1f,											 // wheight
+			0.1f, // wheight
 			JPH::RVec3(0.0, 1.0, 0.0), // start pos
 			JPH::Quat::sIdentity(),
 			// JPH::Quat::sRotation(JPH::Vec3::sAxisX(), JPH::DegreesToRadians(90.0f)), // start rPot
