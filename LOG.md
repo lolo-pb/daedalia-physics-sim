@@ -6,3 +6,5 @@ controll .
 
 i gelieve high angula velocities fucks with simulated
 imu readings.
+
+<important!> i noticed that it goes crazy if you switch to other controllers, if not its scarily stable
