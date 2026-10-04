@@ -1,9 +1,25 @@
 #include "controllers/tbc_controller.hpp"
 
+#include <array>
 #include <cmath>
 
 namespace {
+
+constexpr float HoverThrottle = 0.7f; // TODO this needs checking
+
 constexpr SensorVector3 WorldUp{0.0f, 1.0f, 0.0f};
+constexpr vec3f MotorLocalPositions[6] = {
+		{0.096f, 0.167f, 0.272f},		// Upper face 1
+		{-0.192f, 0.000f, 0.272f},	// Upper face 2
+		{0.096f, -0.167f, 0.272f},	// Upper face 3
+		{0.096f, 0.167f, -0.272f},	// Lower face 1
+		{-0.192f, 0.000f, -0.272f}, // Lower face 2
+		{0.096f, -0.167f, -0.272f}, // Lower face 3
+};
+vec3f motorWorldPositions[6]{};
+
+float motorThrusts[6]{};
+
 } // namespace
 
 TBCController::TBCController() = default;
@@ -18,6 +34,21 @@ void TBCController::Update(const ControllerInput &input, MotorCommands &motor_co
 	if (!std::isfinite(timestep) || timestep <= 0.0f) { return; }
 
 	UpdateAttitudeEstimate(input.imu, timestep);
+
+	/// THRUST UP /////
+
+	float sumy = 0;
+
+	// We asign a thrust based on huw much vertically that motro norlam contributes
+	for (int i = 0; i < 6; i++) {
+		motorWorldPositions[i] = RotateVector(orientation_, MotorLocalPositions[i]);
+		sumy += motorWorldPositions[i].y;
+	}
+	for (int i = 0; i < 6; i++) {
+		motorThrusts[i] = (motorWorldPositions[i].y / sumy) * HoverThrottle;
+	}
+
+	/// THRUST UP /////
 }
 
 void TBCController::UpdateAttitudeEstimate(const ImuSample &imu, float timestep) {
