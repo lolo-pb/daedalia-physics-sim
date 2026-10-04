@@ -180,7 +180,7 @@ int RunInteractiveApplication(std::optional<DroneType> selected_drone) {
     bool looking = false;
     bool paused = false;
     bool single_step = false;
-    bool follow_drone = false;
+    bool follow_drone = true;
     Camera camera;
     glm::vec3 previous_drone_position = ToGlm(simulation.GetDronePosition());
     auto previous_time = std::chrono::steady_clock::now();
