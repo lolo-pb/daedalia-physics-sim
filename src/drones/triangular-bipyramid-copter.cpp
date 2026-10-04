@@ -4,7 +4,7 @@ DroneDefinition CreateTriangularBipyramidCopterDefinition() {
 	return {
 			// JPH::Vec3(0.577, 0.50, 0.816), // half extent, box that holds the
 			JPH::Vec3(0.096, 0.167, 0.272),
-			0.1f, // wheight
+			0.5f, // wheight
 			JPH::RVec3(0.0, 1.0, 0.0), // start pos
 			JPH::Quat::sIdentity(),
 			// JPH::Quat::sRotation(JPH::Vec3::sAxisX(), JPH::DegreesToRadians(90.0f)), // start rPot
@@ -21,37 +21,37 @@ DroneDefinition CreateTriangularBipyramidCopterDefinition() {
 				JPH::Vec3(0.4714f, 0.8165f, 0.3333f),
 				1000.0f,
 				5.0e-6f,
-				2.0e-8f},
+					2.0e-8f},
 			 {JPH::Vec3(-0.192, 0.000, 0.272),
 				JPH::Vec3(-0.9426f, 0.0000f, 0.3338f),
 				JPH::Vec3(-0.9426f, 0.0000f, 0.3338f),
 				1000.0f,
 				5.0e-6f,
-				2.0e-8f},
+					2.0e-8f},
 			 {JPH::Vec3(0.096, -0.167, 0.272),
 				JPH::Vec3(0.4714f, -0.8165f, 0.3333f),
 				JPH::Vec3(0.4714f, -0.8165f, 0.3333f),
 				1000.0f,
 				5.0e-6f,
-				2.0e-8f},
+					2.0e-8f},
 			 {JPH::Vec3(0.096, 0.167, -0.272),
 				JPH::Vec3(0.4714f, 0.8165f, -0.3333f),
 				JPH::Vec3(0.4714f, 0.8165f, -0.3333f),
 				1000.0f,
 				5.0e-6f,
-				2.0e-8f},
+					2.0e-8f},
 			 {JPH::Vec3(-0.192, 0.000, -0.272),
 				JPH::Vec3(-0.9426f, 0.0000f, -0.3338f),
 				JPH::Vec3(-0.9426f, 0.0000f, -0.3338f),
 				1000.0f,
 				5.0e-6f,
-				2.0e-8f},
+					2.0e-8f},
 			 {JPH::Vec3(0.096, -0.167, -0.272),
 				JPH::Vec3(0.4714, -0.8165, -0.3333),
 				JPH::Vec3(0.4714, -0.8165, -0.3333),
 				1000.0f,
 				5.0e-6f,
-				2.0e-8f}},
+					2.0e-8f}},
 	};
 }
 
