@@ -17,16 +17,17 @@ struct MotorDefinition {
 };
 
 struct DroneDefinition {
-    JPH::Vec3 body_half_extent;
-    float mass = 0.0f;
-    JPH::RVec3 start_position;
-    JPH::Quat start_rotation;
-    std::vector<MotorDefinition> motors;
+    JPH::Vec3 body_half_extent;          // half extents of box collision shape in meters (full size = 2 * extent)
+    float mass = 0.0f;                   // total mass in kg (inertia auto-calculated from box shape)
+    JPH::RVec3 start_position;           // world-space spawn position in meters
+    JPH::Quat start_rotation;            // world-space spawn orientation (sIdentity = level)
+    std::vector<MotorDefinition> motors; // list of motors (variable count, defines thrust geometry)
 };
 
 enum class DroneType {
     Quadcopter,
     Tricopter,
+    TriangularBipyramidCopter,
 };
 
 struct DroneOption {
@@ -42,3 +43,4 @@ std::optional<DroneType> FindAvailableDroneType(std::string_view command_name);
 DroneDefinition CreateDroneDefinition(DroneType type);
 DroneDefinition CreateQuadcopterDefinition();
 DroneDefinition CreateTricopterDefinition();
+DroneDefinition CreateTriangularBipyramidCopterDefinition();

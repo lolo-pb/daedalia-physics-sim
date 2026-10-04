@@ -2,6 +2,13 @@
 
 Daedalia is a native C++ flight-physics test bed. SDL owns the window and OpenGL context, Jolt advances rigid-body physics, ImGui provides debug controls, and the renderer draws the latest simulated state.
 
+## Currently
+
+  as of rn im buiding the triangular bypyramid drone
+  its here the geometry is ugly af but its cool, the torque directions need to be checked and it needs a controller
+
+#
+
 Build and run:
 
 ```sh
@@ -107,6 +114,12 @@ Switching controllers resets the newly selected stateful controller but leaves t
 
 ## Future work
 
+- Freeform visual geometry
 
-- Tune and validate the controllers against the quadcopter.
-- Add more layouts, saved scenarios, and experimental sensor or force models.
+- Change coliisions to spheres
+
+- Physics migration to Nexus GPU. It works without NVIDIA, but it is Rust and still new. 
+
+- Tune quadcopter controller.
+- Add sensor noise.
+- Add map geometry.

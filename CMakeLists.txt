@@ -75,6 +75,7 @@ add_library(controller STATIC
     src/controllers/pid.cpp
     src/controllers/position_hold_controller.cpp
     src/controllers/quaternion.cpp
+    src/controllers/tbc_controller.cpp
     src/controllers/tricopter_angle_mode_controller.cpp
 )
 target_include_directories(controller PUBLIC
@@ -94,6 +95,7 @@ add_executable(daedalia
     src/drones/drone_definition.cpp
     src/drones/quadcopter.cpp
     src/drones/tricopter.cpp
+    src/drones/triangular-bipyramid-copter.cpp
     src/sensors/ideal_barometer.cpp
     src/sensors/ideal_gps.cpp
     src/sensors/ideal_imu.cpp
