@@ -43,12 +43,12 @@ void TBCController::Update(const ControllerInput &input, MotorCommands &motor_co
 	for (int i = 0; i < 6; i++) {
 		motorWorldNormals[i] = RotateVector(orientation_, MotorLocalNormals[i]);
 		float yComponent = motorWorldNormals[i].y;
-		sumy += yComponent > 0 ? yComponent : 0;
+		sumy += (yComponent > 0) ? yComponent * yComponent : 0;
 	}
 	for (int i = 0; i < 6; i++) {
 		if (motorWorldNormals[i].y > 0 && sumy != 0) {
 			//motor_commands.SetMotor(i, (motorWorldNormals[i].y / sumy) * HoverThrottle);
-			motor_commands.SetMotor(i, (HoverThrottle / sumy));
+			motor_commands.SetMotor(i, ((HoverThrottle / sumy) * motorWorldNormals[i].y));
 		}
 	}
 

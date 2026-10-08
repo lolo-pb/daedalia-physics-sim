@@ -131,3 +131,5 @@ Switching controllers resets the newly selected stateful controller but leaves t
 - 4x 4rotor drone for 0 G
 
 - add telemetry loggign to csv
+
+- add a streak to see drone movement better
