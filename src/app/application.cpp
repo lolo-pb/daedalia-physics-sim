@@ -252,7 +252,9 @@ int RunInteractiveApplication(std::optional<AircraftType> selected_aircraft) {
         DrawSensorsPanel(simulation);
 
         const bool *keys = SDL_GetKeyboardState(nullptr);
-        const float movement_speed = (keys[SDL_SCANCODE_LSHIFT] || keys[SDL_SCANCODE_RSHIFT] ? 15.0f : 5.0f) * frame_seconds;
+        const float camera_speed_scale = camera_distance / 7.0f;
+        const float movement_speed = (keys[SDL_SCANCODE_LSHIFT] || keys[SDL_SCANCODE_RSHIFT] ? 15.0f : 5.0f)
+            * camera_speed_scale * frame_seconds;
         const glm::vec3 forward = camera.Forward();
         const glm::vec3 horizontal_forward = glm::normalize(glm::vec3(forward.x, 0.0f, forward.z));
         const glm::vec3 right = glm::normalize(glm::cross(horizontal_forward, glm::vec3(0.0f, 1.0f, 0.0f)));
