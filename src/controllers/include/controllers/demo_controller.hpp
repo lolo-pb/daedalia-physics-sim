@@ -5,7 +5,7 @@
 class DemoController {
 public:
   void Reset();
-  void Update(const ControllerInput &input, MotorCommands &motor_commands);
+  void Update(const ControllerInput &input, ControllerOutput &output);
 
 private:
   bool armed_ = false;
