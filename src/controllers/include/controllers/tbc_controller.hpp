@@ -12,6 +12,7 @@ public:
 
 private:
 	Quaternion orientation_;
+	Pid altitude_pid_;
 	bool initialized_ = false;
 
 	void UpdateAttitudeEstimate(const ImuSample &imu, float timestep);

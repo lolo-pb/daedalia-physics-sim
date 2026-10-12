@@ -1,11 +1,14 @@
 #include "controllers/tbc_controller.hpp"
+#include "sensors/ideal_barometer.hpp"
 
 #include <array>
 #include <cmath>
 
 namespace {
 
-constexpr float HoverThrottle = 0.981f; // TODO this needs checking
+//constexpr float HoverThrottle = 0.981f; // This is an estimate
+constexpr float HoverThrottle = 0.97f; // This is an estimate
+constexpr float TargetAltitude = 2.0f; // target Altitude manm self explanatory
 
 constexpr SensorVector3 WorldUp{0.0f, 1.0f, 0.0f};
 constexpr vec3f MotorLocalNormals[6] = {
@@ -20,9 +23,19 @@ vec3f motorWorldNormals[6]{};
 
 float motorThrusts[6]{};
 
+constexpr PidConfig AltitudePidConfig{
+		0.10f, // proportional
+		0.01f, // integral
+		0.10f, // derivative
+		-2.0f, // minimum integral
+		2.0f, // maximum integral
+		-0.20f, // minimum output
+		0.20f, // maximum output
+};
+
 } // namespace
 
-TBCController::TBCController() = default;
+TBCController::TBCController() : altitude_pid_(AltitudePidConfig){};
 
 void TBCController::Reset() {
 	orientation_ = {};
@@ -34,6 +47,14 @@ void TBCController::Update(const ControllerInput &input, MotorCommands &motor_co
 	if (!std::isfinite(timestep) || timestep <= 0.0f) { return; }
 
 	UpdateAttitudeEstimate(input.imu, timestep);
+
+	/// ALTITUDE CONTROL ///
+
+	const float altitude = BarometricAltitudeMeters(input.barometer.pressure_pascals);
+	const float error = TargetAltitude - altitude;
+	const float lift_correction = altitude_pid_.Update(error, input.gps.world_velocity_meters_per_second.y, timestep);
+
+	float targetThrottle = (lift_correction + 1) * HoverThrottle;
 
 	/// THRUST UP /////
 
@@ -48,7 +69,8 @@ void TBCController::Update(const ControllerInput &input, MotorCommands &motor_co
 	for (int i = 0; i < 6; i++) {
 		if (motorWorldNormals[i].y > 0 && sumy != 0) {
 			//motor_commands.SetMotor(i, (motorWorldNormals[i].y / sumy) * HoverThrottle);
-			motor_commands.SetMotor(i, ((HoverThrottle / sumy) * motorWorldNormals[i].y));
+			//motor_commands.SetMotor(i, ((HoverThrottle / sumy) * motorWorldNormals[i].y));
+			motor_commands.SetMotor(i, ((targetThrottle / sumy) * motorWorldNormals[i].y));
 		}
 	}
 
@@ -78,33 +100,18 @@ void TBCController::UpdateAttitudeEstimate(const ImuSample &imu, float timestep)
 	orientation_ = NormalizeQuaternion(MultiplyQuaternions(orientation_, gyro_rotation));
 }
 
-/* // lolo section //
-
-aparently the projection formula is
-
- ( (A.B)/(|B|^2) ) * B
-
- a, B vectors
- y A.B es la proyeccion por |B|
- y el versor de B es B/|B|
- entonces
-
- (A.B)/|B| por el versor de B
-
-
-
-GPT quiere hacer:
-You chose:
-
-motor_target_i = scale × p_i
-
-where `p_i` is how upward-facing that motor is.
-But that motor’s thrust is tilted, so only a fraction `p_i` of its thrust goes upward:
-
-vertical_lift_i = motor_target_i × p_i
-
-Substitute your motor target rule:
-
-vertical_lift_i = ( (scale × p_i) × p_i ) = ( scale × p_i² )
+/*
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⠤
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡘⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⠶⠚⠁⠀
+⠀⠀⠂⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⡜⠁⠀⠀⠀⠀⠀⠀⠐⢆⡀⠀⠀⠀⠀⢀⣤⣶⠟⠋⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠂⠀⠀⠐⠀⠀⠀⠂⠀⠀⠠⠀⠀⠀⠀⠀⠀⢀⣤⠞⠁⠀⠀⠀⠀⣀⣀⠀⠀⠈⠑⠲⢶⠒⠖⣺⡿⠏⠀⠀⠀⠀⠀⠀
+⠀⠀⠂⠀⠀⠀⠀⠀⢀⣀⣀⣀⣠⣤⣤⣤⣤⣤⣤⣤⡤⠴⠚⡏⠀⠀⣀⡤⣖⣛⣏⢩⡟⠽⠭⠃⠶⢤⣮⣡⣾⠋⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠠⠤⠐⠒⠋⠉⠉⠉⠀⠀⠀⠀⠀⠈⠉⠉⠙⠲⢤⣤⣀⣹⡴⢙⡟⠋⠁⠀⠈⠑⠍⠊⠲⢤⣀⡼⠛⠉⠀⠙⢊⣱⣖⢶⠶⠶⠶⠒
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⣀⣀⣀⠀⠀⠀⠀⠀⠀⣀⣠⢔⡟⠉⠛⡞⠤⣀⣀⣀⣀⣀⡤⠖⠒⠋⠉⠉⠉⠙⠛⠛⠚⠉⠀⠀⠀⠀⠀⠀
+⠀⠀⣀⢤⣴⣒⣾⣉⣛⢋⠉⠭⠾⠯⢯⢝⣹⣟⠛⢳⠛⣟⣒⢲⣞⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠴⠛⠉⠉⠀⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠉⣳⣫⡴⠓⠒⠒⠉⠛⠲⢤⣀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⣯⢻⠁⠀⠀⠀⠀⠀⠀⠈⠙⠲⢄⡀⠀⠀⠀⠀⢀⠀⠠⠀⠀⠀⡀⠀⠀⠄⠀⠂⠀⠀
+⠀⠀⠀⠀⠀⠀⠦⣀⡀⠀⠀⠀⠀⠀⠀⣠⣼⡵⠗⠉⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⢀⠀⠂⠀⠠⠀⠀⠀⠈⠉⠓⠒⠶⠚⠙⠃⠉⠀⠀⠀⠀⠀⠀⠀⠀⠠⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠄⠀⠀⠀⠀⠀⠀⠀⠀
 
 */
