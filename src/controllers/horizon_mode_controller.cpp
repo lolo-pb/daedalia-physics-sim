@@ -14,10 +14,6 @@ constexpr float ThrottleRatePerSecond = 0.25f;
 constexpr float HoverThrottle = 0.4905f;
 constexpr float ComplementaryGyroWeight = 0.98f;
 constexpr float MinimumAccelerationSquared = 1.0e-6f;
-constexpr std::size_t FrontLeftMotor = 0;
-constexpr std::size_t FrontRightMotor = 1;
-constexpr std::size_t RearRightMotor = 2;
-constexpr std::size_t RearLeftMotor = 3;
 
 constexpr PidConfig PitchPidConfig{
     1.0f, 0.0f, 0.1f,
@@ -42,23 +38,16 @@ float BlendAngle(float gyro_angle, float accelerometer_angle) {
 }
 
 void MixMotorTargets(
-    MotorCommands &motor_commands,
+    ControllerOutput &output,
     float throttle,
     float pitch_correction,
     float roll_correction,
     float yaw_correction) {
-    motor_commands.SetMotor(
-        FrontLeftMotor,
-        throttle + pitch_correction - roll_correction + yaw_correction);
-    motor_commands.SetMotor(
-        FrontRightMotor,
-        throttle + pitch_correction + roll_correction - yaw_correction);
-    motor_commands.SetMotor(
-        RearRightMotor,
-        throttle - pitch_correction + roll_correction + yaw_correction);
-    motor_commands.SetMotor(
-        RearLeftMotor,
-        throttle - pitch_correction - roll_correction - yaw_correction);
+    // F450 order: front-right, aft-left, front-left, aft-right.
+    output.SetMotor(0, throttle + pitch_correction - roll_correction + yaw_correction);
+    output.SetMotor(1, throttle - pitch_correction + roll_correction + yaw_correction);
+    output.SetMotor(2, throttle + pitch_correction + roll_correction - yaw_correction);
+    output.SetMotor(3, throttle - pitch_correction - roll_correction - yaw_correction);
 }
 
 } // namespace
@@ -84,7 +73,7 @@ void HorizonModeController::Reset() {
 
 void HorizonModeController::Update(
     const ControllerInput &input,
-    MotorCommands &motor_commands) {
+    ControllerOutput &output) {
     const float timestep = input.timestep_seconds;
     if (timestep <= 0.0f) {
         return;
@@ -117,13 +106,13 @@ void HorizonModeController::Update(
     UpdateAttitudeEstimate(input.imu, timestep);
     const SensorVector3 &gyro = input.imu.body_gyro_rad_per_second;
     const float pitch_correction = pitch_pid_.Update(
-        WrapAngle(target_pitch_rad_ - pitch_rad_), gyro.x, timestep);
+        WrapAngle(target_pitch_rad_ - pitch_rad_), gyro.y, timestep);
     const float roll_correction = roll_pid_.Update(
-        WrapAngle(target_roll_rad_ - roll_rad_), gyro.z, timestep);
+        WrapAngle(target_roll_rad_ - roll_rad_), gyro.x, timestep);
     const float yaw_correction = yaw_pid_.Update(
-        WrapAngle(target_yaw_rad_ - yaw_rad_), gyro.y, timestep);
+        WrapAngle(target_yaw_rad_ - yaw_rad_), gyro.z, timestep);
     MixMotorTargets(
-        motor_commands,
+        output,
         throttle_,
         pitch_correction,
         roll_correction,
@@ -139,16 +128,15 @@ void HorizonModeController::UpdateAttitudeEstimate(
     float timestep) {
     const SensorVector3 &gyro = imu.body_gyro_rad_per_second;
     const SensorVector3 &acceleration =
-        imu.body_specific_force_meters_per_second_squared;
+        imu.body_specific_force_ft_per_second_squared;
     const float acceleration_squared = acceleration.x * acceleration.x
         + acceleration.y * acceleration.y
         + acceleration.z * acceleration.z;
     const bool has_accelerometer_attitude =
         acceleration_squared > MinimumAccelerationSquared;
-    const float accelerometer_pitch =
-        std::atan2(-acceleration.z, acceleration.y);
-    const float accelerometer_roll =
-        std::atan2(acceleration.x, acceleration.y);
+    const float accelerometer_pitch = std::atan2(
+        -acceleration.x, std::sqrt(acceleration.y * acceleration.y + acceleration.z * acceleration.z));
+    const float accelerometer_roll = std::atan2(acceleration.y, -acceleration.z);
 
     if (!attitude_initialized_) {
         if (has_accelerometer_attitude) {
@@ -159,9 +147,9 @@ void HorizonModeController::UpdateAttitudeEstimate(
         return;
     }
 
-    pitch_rad_ = WrapAngle(pitch_rad_ + gyro.x * timestep);
-    roll_rad_ = WrapAngle(roll_rad_ + gyro.z * timestep);
-    yaw_rad_ = WrapAngle(yaw_rad_ + gyro.y * timestep);
+    pitch_rad_ = WrapAngle(pitch_rad_ + gyro.y * timestep);
+    roll_rad_ = WrapAngle(roll_rad_ + gyro.x * timestep);
+    yaw_rad_ = WrapAngle(yaw_rad_ + gyro.z * timestep);
     if (has_accelerometer_attitude) {
         pitch_rad_ = BlendAngle(pitch_rad_, accelerometer_pitch);
         roll_rad_ = BlendAngle(roll_rad_, accelerometer_roll);

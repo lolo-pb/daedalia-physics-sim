@@ -9,6 +9,8 @@
 
 #include "controllers/c172_direct_controller.hpp"
 #include "controllers/demo_controller.hpp"
+#include "controllers/angle_mode_controller.hpp"
+#include "controllers/horizon_mode_controller.hpp"
 #include "physics/jsbsim_backend.hpp"
 #include "sensors/ideal_imu.hpp"
 #include "sensors/ideal_gps.hpp"
@@ -27,6 +29,8 @@ struct Simulation::Impl {
     const AircraftDefinition &definition;
     JsbsimBackend backend;
     DemoController f450_demo;
+    AngleModeController f450_angle;
+    HorizonModeController f450_horizon;
     C172DirectController c172_direct;
     ControllerType active = ControllerType::F450Demo;
     ControllerOutput commands;
@@ -67,6 +71,8 @@ void Simulation::SelectController(int slot) {
     if (selected == impl_->active) return;
     impl_->active = selected;
     impl_->f450_demo.Reset();
+    impl_->f450_angle.Reset();
+    impl_->f450_horizon.Reset();
     impl_->c172_direct.Reset();
     impl_->commands.Clear();
 }
@@ -78,6 +84,12 @@ void Simulation::Step(const ControllerKeys &keys) {
     switch (impl_->active) {
     case ControllerType::F450Demo:
         impl_->f450_demo.Update(input, impl_->commands);
+        break;
+    case ControllerType::F450Angle:
+        impl_->f450_angle.Update(input, impl_->commands);
+        break;
+    case ControllerType::F450Horizon:
+        impl_->f450_horizon.Update(input, impl_->commands);
         break;
     case ControllerType::C172Direct:
         impl_->c172_direct.Update(input, impl_->commands);
@@ -97,6 +109,8 @@ void Simulation::Step(const ControllerKeys &keys) {
 void Simulation::Reset() {
     impl_->backend.Reset(GetPhysicsStepSeconds());
     impl_->f450_demo.Reset();
+    impl_->f450_angle.Reset();
+    impl_->f450_horizon.Reset();
     impl_->c172_direct.Reset();
     impl_->commands.Clear();
     impl_->rotor_angles.fill(0);
@@ -106,6 +120,8 @@ void Simulation::Reset() {
 ControllerType Simulation::GetActiveController() const { return impl_->active; }
 float Simulation::GetActiveControllerThrottle() const {
     if (impl_->active == ControllerType::C172Direct) return impl_->c172_direct.GetThrottle();
+    if (impl_->active == ControllerType::F450Angle) return impl_->f450_angle.GetThrottle();
+    if (impl_->active == ControllerType::F450Horizon) return impl_->f450_horizon.GetThrottle();
     return 0.0f;
 }
 const ControllerOutput &Simulation::GetLatestCommands() const { return impl_->commands; }

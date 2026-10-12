@@ -7,6 +7,8 @@ namespace {
 const char *ControllerName(ControllerType type) {
     switch (type) {
     case ControllerType::F450Demo: return "F450 demo";
+    case ControllerType::F450Angle: return "F450 angle";
+    case ControllerType::F450Horizon: return "F450 horizon";
     case ControllerType::C172Direct: return "C172 direct";
     }
     return "Unknown";
@@ -26,9 +28,18 @@ PhysicsPanelResult DrawPhysicsPanel(Simulation &simulation, bool &paused,
             simulation.SelectController(static_cast<int>(i + 1));
         }
     }
-    if (simulation.GetActiveController() == ControllerType::F450Demo) {
+    const ControllerType active_controller = simulation.GetActiveController();
+    if (active_controller == ControllerType::F450Demo) {
         ImGui::TextUnformatted("X: arm/disarm all four raw motor commands (0.8)");
         ImGui::TextUnformatted("No mixer or stabilization is supplied by the simulator");
+    } else if (active_controller == ControllerType::F450Angle) {
+        ImGui::Text("Throttle: %.3f", simulation.GetActiveControllerThrottle());
+        ImGui::TextUnformatted("W/S pitch, A/D roll: 10 degree attitude targets; Q/E yaw; R/F throttle");
+        ImGui::TextUnformatted("Controller-owned motor mixer; no simulator stabilization");
+    } else if (active_controller == ControllerType::F450Horizon) {
+        ImGui::Text("Throttle: %.3f", simulation.GetActiveControllerThrottle());
+        ImGui::TextUnformatted("W/S pitch, A/D roll: adjust attitude target; Q/E yaw; R/F throttle");
+        ImGui::TextUnformatted("Controller-owned motor mixer; no simulator stabilization");
     } else {
         ImGui::Text("Throttle: %.3f", simulation.GetActiveControllerThrottle());
         ImGui::TextUnformatted("W/S elevator, A/D aileron, Q/E rudder, R/F throttle");

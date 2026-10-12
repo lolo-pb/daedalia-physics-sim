@@ -8,7 +8,7 @@ public:
     HorizonModeController();
 
     void Reset();
-    void Update(const ControllerInput &input, MotorCommands &motor_commands);
+    void Update(const ControllerInput &input, ControllerOutput &output);
 
     float GetThrottle() const;
 

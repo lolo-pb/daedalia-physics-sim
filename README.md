@@ -20,7 +20,7 @@ Aircraft XML, engines and systems are copied into `build/jsbsim-data`. The execu
 
 ## Controls
 
-Each aircraft declares its own controller. The F450 demo controller writes four raw motor commands (no mixer or stabilization); the C172 direct controller writes throttle and named actuator commands for aileron, elevator, rudder, flaps, and brakes. JSBSim provides aircraft dynamics only; its bundled stabilizers and autopilots are held off.
+Each aircraft declares its own controller. The F450 offers demo, angle, and horizon controllers; each writes four raw motor commands with its own mixer. The C172 direct controller writes throttle and named actuator commands for aileron, elevator, rudder, flaps, and brakes. JSBSim provides aircraft dynamics only; its bundled stabilizers and autopilots are held off.
 
 - W/S pitch, A/D roll, Q/E yaw.
 - R/F increase/decrease throttle (starts at zero).

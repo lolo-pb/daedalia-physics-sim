@@ -71,8 +71,11 @@ target_link_libraries(imgui PRIVATE SDL3::SDL3 glad OpenGL::GL)
 find_package(OpenGL REQUIRED)
 
 add_library(controller STATIC
+    src/controllers/angle_mode_controller.cpp
     src/controllers/c172_direct_controller.cpp
     src/controllers/demo_controller.cpp
+    src/controllers/horizon_mode_controller.cpp
+    src/controllers/pid.cpp
 )
 target_include_directories(controller PUBLIC
     src/controllers/include
