@@ -8,7 +8,7 @@ public:
     PositionHoldController();
 
     void Reset();
-    void Update(const ControllerInput &input, MotorCommands &motor_commands);
+    void Update(const ControllerInput &input, ControllerOutput &output);
 
 private:
     void CaptureTarget(const ControllerInput &input);
@@ -18,9 +18,9 @@ private:
     Pid roll_pid_;
     Pid yaw_pid_;
     Pid altitude_pid_;
-    float target_world_x_meters_ = 0.0f;
-    float target_world_z_meters_ = 0.0f;
-    float target_altitude_meters_ = 0.0f;
+    float target_north_ft_ = 0.0f;
+    float target_east_ft_ = 0.0f;
+    float target_altitude_ft_ = 0.0f;
     float target_heading_rad_ = 0.0f;
     float pitch_rad_ = 0.0f;
     float roll_rad_ = 0.0f;

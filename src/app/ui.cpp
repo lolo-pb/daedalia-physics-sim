@@ -9,6 +9,7 @@ const char *ControllerName(ControllerType type) {
     case ControllerType::F450Demo: return "F450 demo";
     case ControllerType::F450Angle: return "F450 angle";
     case ControllerType::F450Horizon: return "F450 horizon";
+    case ControllerType::F450PositionHold: return "F450 position hold";
     case ControllerType::C172Direct: return "C172 direct";
     }
     return "Unknown";
@@ -40,6 +41,9 @@ PhysicsPanelResult DrawPhysicsPanel(Simulation &simulation, bool &paused,
         ImGui::Text("Throttle: %.3f", simulation.GetActiveControllerThrottle());
         ImGui::TextUnformatted("W/S pitch, A/D roll: adjust attitude target; Q/E yaw; R/F throttle");
         ImGui::TextUnformatted("Controller-owned motor mixer; no simulator stabilization");
+    } else if (active_controller == ControllerType::F450PositionHold) {
+        ImGui::TextUnformatted("W/S north/south target, A/D west/east target, R/F altitude target, Q/E heading target");
+        ImGui::TextUnformatted("GPS/barometer/IMU position hold with a controller-owned motor mixer");
     } else {
         ImGui::Text("Throttle: %.3f", simulation.GetActiveControllerThrottle());
         ImGui::TextUnformatted("W/S elevator, A/D aileron, Q/E rudder, R/F throttle");

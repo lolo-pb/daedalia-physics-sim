@@ -6,7 +6,8 @@
 namespace {
 
 constexpr std::array F450Controllers{
-    ControllerType::F450Demo, ControllerType::F450Angle, ControllerType::F450Horizon};
+    ControllerType::F450Demo, ControllerType::F450Angle, ControllerType::F450Horizon,
+    ControllerType::F450PositionHold};
 constexpr std::array C172Controllers{ControllerType::C172Direct};
 constexpr std::array<std::string_view, 7> Controls{
     "fcs/throttle-cmd-norm", "fcs/aileron-cmd-norm", "fcs/elevator-cmd-norm",

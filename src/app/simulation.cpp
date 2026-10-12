@@ -11,6 +11,7 @@
 #include "controllers/demo_controller.hpp"
 #include "controllers/angle_mode_controller.hpp"
 #include "controllers/horizon_mode_controller.hpp"
+#include "controllers/position_hold_controller.hpp"
 #include "physics/jsbsim_backend.hpp"
 #include "sensors/ideal_imu.hpp"
 #include "sensors/ideal_gps.hpp"
@@ -31,6 +32,7 @@ struct Simulation::Impl {
     DemoController f450_demo;
     AngleModeController f450_angle;
     HorizonModeController f450_horizon;
+    PositionHoldController f450_position_hold;
     C172DirectController c172_direct;
     ControllerType active = ControllerType::F450Demo;
     ControllerOutput commands;
@@ -73,6 +75,7 @@ void Simulation::SelectController(int slot) {
     impl_->f450_demo.Reset();
     impl_->f450_angle.Reset();
     impl_->f450_horizon.Reset();
+    impl_->f450_position_hold.Reset();
     impl_->c172_direct.Reset();
     impl_->commands.Clear();
 }
@@ -90,6 +93,9 @@ void Simulation::Step(const ControllerKeys &keys) {
         break;
     case ControllerType::F450Horizon:
         impl_->f450_horizon.Update(input, impl_->commands);
+        break;
+    case ControllerType::F450PositionHold:
+        impl_->f450_position_hold.Update(input, impl_->commands);
         break;
     case ControllerType::C172Direct:
         impl_->c172_direct.Update(input, impl_->commands);
@@ -111,6 +117,7 @@ void Simulation::Reset() {
     impl_->f450_demo.Reset();
     impl_->f450_angle.Reset();
     impl_->f450_horizon.Reset();
+    impl_->f450_position_hold.Reset();
     impl_->c172_direct.Reset();
     impl_->commands.Clear();
     impl_->rotor_angles.fill(0);

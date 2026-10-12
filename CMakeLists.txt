@@ -76,6 +76,7 @@ add_library(controller STATIC
     src/controllers/demo_controller.cpp
     src/controllers/horizon_mode_controller.cpp
     src/controllers/pid.cpp
+    src/controllers/position_hold_controller.cpp
 )
 target_include_directories(controller PUBLIC
     src/controllers/include
