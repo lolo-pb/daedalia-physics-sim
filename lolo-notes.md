@@ -1,55 +1,75 @@
 # Daedalia Physics Sim
 
-## Structure
+## Current state
 
-- `src/app/`: startup selection, window, fixed-step loop, debug UI, camera and OpenGL.
-- `src/aircraft/`: one AircraftDefinition per aircraft, referencing its physics model, initial conditions, graphics parts, control bindings and available controllers.
+JSBSim 1.3.2 has replaced Jolt, including ground reactions. F450 quadcopter and C172 are selectable at startup or with `--aircraft f450|c172`. Both currently offer ManualController.
+
+OpenGL draws representative aircraft parts, with pose, propellers and hinged surfaces driven by JSBSim. ImGui shows physics and programmable sensor readings. Backend smoke checks and offscreen rendering checks passed; this is not full model/controller validation.
+
+## Structure and flow
+
+- `src/aircraft/`: one AircraftDefinition owns each aircraft's model, initial conditions, integration settings, graphics references, control bindings and available controllers. Drones and planes use the same system.
 - `src/physics/`: JSBSim backend and native aircraft state.
 - `src/sensors/`: programmable ideal IMU, local GPS, barometer and magnetometer.
-- `src/controllers/`: unified input/output API and ManualController. Original controller implementations remain unbuilt pending review.
+- `src/controllers/`: one ControllerInput / ControllerOutput contract and ManualController. Original controller algorithms remain untouched and excluded from the build.
+- `src/app/`: startup selection, fixed-step loop, SDL window, camera, ImGui and OpenGL. `src/main.cpp` launches interactive or headless mode.
 
-F450 and C172 are bundled JSBSim models. Their representative geometry is made from simple parts; pose, propellers and surface movement follow actual simulation state.
+The old `src/drones/` files were removed; any remaining folders are empty leftovers. Custom drone declarations are recoverable through Git history, not ported JSBSim aircraft.
 
-## Flow
+Main file flow (arrows show calls or data passed between files):
 
-```text
-main -> startup aircraft selector -> AircraftDefinition
-     -> Simulation + JSBSim -> sensors -> selected controller
-     -> ControllerOutput -> JSBSim step
-     -> latest state -> UI and OpenGL aircraft parts
+```mermaid
+flowchart TD
+    main["src/main.cpp"] --> app["src/app/application.cpp"]
+    main -->|"Headless checks"| sim["src/app/simulation.cpp"]
+    app --> menu["src/app/aircraft_selection_menu.cpp"]
+    menu -->|"Aircraft choice"| definition["src/aircraft/aircraft_definition.cpp"]
+    definition -->|"Model and settings"| sim
+    app -->|"Keys and fixed-step tick"| sim
+    sim --> backend["src/physics/jsbsim_backend.cpp"]
+    backend -->|"Native state"| state["src/physics/aircraft_state.hpp"]
+    state --> sensors["src/sensors/ideal_*.cpp"]
+    sensors -->|"Samples: ControllerInput"| io["src/controllers/include/controllers/controller_io.hpp"]
+    io --> controller["src/controllers/manual_controller.cpp"]
+    controller -->|"ControllerOutput via Simulation"| backend
+    sim -->|"Render state"| renderer["src/app/renderer.cpp"]
+    definition -->|"Visual parts"| renderer
+    sim -->|"Debug state and sensor samples"| ui["src/app/ui.cpp"]
+    ui -->|"Pause, reset and frequency"| app
 ```
 
-Aircraft is chosen at startup. Each aircraft definition supplies its controller choices; both currently offer Manual. Reset rebuilds the model at its on-ground starting state and clears manual commands. Default frequency is 60 Hz, configurable in the UI.
+## Boundaries
 
-Each aircraft also owns its maximum JSBSim integration interval: F450 0.002 seconds, C172 1/120 second, matching bundled script defaults. Physics substeps hold controller commands; sensors and controllers run once per configured tick.
+Physics and sensors keep native units: feet, ft/s, ft/s², psf, slugs and radians. Controllers own any conversions. Body axes are forward/right/down; GPS uses local NED. Ground truth is not part of ControllerInput.
 
-## Units and responsibilities
+Rendering also uses feet, mapping axes to X right, Y up, -Z forward. Ground reactions are JSBSim only; visual meshes do not provide arbitrary collisions.
 
-Physics and sensor samples keep JSBSim native units: feet, ft/s, ft/s², psf, slugs and radians. Body axes are forward/right/down; GPS is local NED. Controllers perform any conversions they need.
+The configurable controller/sensor tick defaults to 60 Hz. Each aircraft owns a smaller maximum internal physics interval where needed; commands are held across substeps. Reset restores starting physics, sensors and manual controller state.
 
-Rendering keeps lengths in feet and maps axes to X right, Y up, -Z forward. Ground contact is JSBSim only. No Jolt or arbitrary mesh collision.
+Manual is a normal controller. F450 currently uses its bundled stabilization/mixer; C172 uses standard surface commands. Indexed motor commands exist in the unified output but are not connected to JSBSim yet.
 
-Manual uses the bundled aircraft controls, including F450's stock rate stabilization. Raw indexed motor targets remain in the unified output API for later controller integration; they are not yet connected to JSBSim.
-
-Ground truth is not exposed through ControllerInput. Each controller owns its sensor interpretation, fusion, units, PID state and mixing. Selectable controllers use `_controller` names; shared utilities such as `pid` stay independent.
-
-Stock F450 data emits version and internal sensor-binding warnings. Both backend checks pass and a longer run showed lift-off, but model validation/tuning is still separate work.
-
-## Build
+## Build and run
 
 ```sh
 cmake -S . -B build
 cmake --build build -j4
-./build/daedalia --aircraft f450
-./build/daedalia --aircraft c172
+./build/daedalia
 ctest --test-dir build --output-on-failure
 ```
 
-CMake fetches JSBSim 1.3.2 and the graphics dependencies. Model data is copied to build/jsbsim-data and resolved independently of the launch directory.
+CMake downloads dependencies and copies JSBSim model data to `build/jsbsim-data`; its configured path works independently of the launch directory. See README for keyboard controls and direct aircraft/headless launch flags.
 
-## Migration pause
+## Next step: approval required
 
-Stop after stages 1–5. Review existing controllers and custom aircraft one by one with the user before adapting them. Old drone definitions are recoverable through Git history; no custom physics model has been ported yet.
+Migration stages 1–5 are complete. Do not adapt existing controllers until the user explicitly approves. Review controllers individually, then custom aircraft declarations.
+
+The next proposed choice is F450 direct-motor control versus using its bundled stabilization/mixer. Direct motors would let existing controllers own stabilization and mixing, but motor order, directions and bindings must first be checked. This choice is not approved yet.
+
+## Limitations and deferred ideas
+
+Stock F450 data emits configuration-version and internal sensor-binding warnings. Stepping and lift-off worked; model validation/tuning remains separate work.
+
+Deferred: sensor noise/sample rates, telemetry CSV, movement trails, richer aircraft assets and map geometry. Preserve the custom-aircraft ideas: check triangular-bipyramid torque directions, add its altitude/GPS position hold, and explore a 4-by-4-rotor zero-gravity aircraft.
 
 ## Later work
 
