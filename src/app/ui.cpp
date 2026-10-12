@@ -67,8 +67,6 @@ PhysicsPanelResult DrawPhysicsPanel(Simulation &simulation, bool &paused,
     ImGui::Text("Time: %.3f s", state.timestamp_seconds);
     ImGui::Text("Position NED (ft): %.3f, %.3f, %.3f", state.position_ned_ft.x, state.position_ned_ft.y, state.position_ned_ft.z);
     ImGui::Text("Velocity NED (ft/s): %.3f, %.3f, %.3f", state.velocity_ned_ft_per_second.x, state.velocity_ned_ft_per_second.y, state.velocity_ned_ft_per_second.z);
-    ImGui::Text("Mass: %.3f slugs", state.mass_slugs);
-    ImGui::Text("Gravity: %.3f ft/s^2", state.gravity_ft_per_second_squared);
     ImGui::Text("Altitude ASL: %.3f ft", state.altitude_asl_ft);
     const auto &commands = simulation.GetLatestCommands();
     ImGui::Text("Aileron/elevator/rudder: %.2f, %.2f, %.2f", commands.aileron, commands.elevator, commands.rudder);

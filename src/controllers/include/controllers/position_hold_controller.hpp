@@ -2,6 +2,7 @@
 
 #include "controllers/controller_io.hpp"
 #include "controllers/pid.hpp"
+#include "controllers/quaternion.hpp"
 
 class PositionHoldController {
 public:
@@ -12,7 +13,7 @@ public:
 
 private:
     void CaptureTarget(const ControllerInput &input);
-    void InitializeLevelFromGravity(const ControllerInput &input);
+    void CollectAccelerometerInitializationSample(const ControllerInput &input);
     void UpdateAttitudeEstimate(const ControllerInput &input);
     bool RecoverLevel(const ControllerInput &input, ControllerOutput &output);
 
@@ -33,6 +34,9 @@ private:
     float pitch_rad_ = 0.0f;
     float roll_rad_ = 0.0f;
     float yaw_rad_ = 0.0f;
+    Quaternion body_to_ned_;
+    SensorVector3 accelerometer_sample_sum_{};
+    int accelerometer_sample_count_ = 0;
     bool attitude_initialized_ = false;
     bool position_hold_initialized_ = false;
 };

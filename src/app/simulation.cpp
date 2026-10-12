@@ -161,7 +161,7 @@ int Simulation::RunSmokeTest() {
             && Finite(s.body_rates_rad_per_second) && Finite(s.body_specific_force_ft_per_second_squared)
             && std::isfinite(s.body_to_ned.w) && std::isfinite(s.body_to_ned.x)
             && std::isfinite(s.body_to_ned.y) && std::isfinite(s.body_to_ned.z)
-            && s.pressure_psf > 0 && s.mass_slugs > 0
+            && s.pressure_psf > 0
             && impl_->imu_sample.timestamp_seconds == s.timestamp_seconds;
     };
     bool valid = check_state();

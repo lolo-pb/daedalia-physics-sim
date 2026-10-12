@@ -11,7 +11,6 @@
 #include <models/FGAccelerations.h>
 #include <models/FGAtmosphere.h>
 #include <models/FGFCS.h>
-#include <models/FGMassBalance.h>
 #include <models/FGPropagate.h>
 #include <models/FGPropulsion.h>
 #include <input_output/FGPropertyManager.h>
@@ -119,8 +118,6 @@ AircraftState JsbsimBackend::ReadState() const {
         for (int column = 0; column < 3; ++column) rotation[column][row] = matrix(row + 1, column + 1);
     state.body_to_ned = glm::normalize(glm::quat_cast(rotation));
     state.pressure_psf = exec.GetAtmosphere()->GetPressure();
-    state.gravity_ft_per_second_squared = exec.GetAccelerations()->GetGravAccelMagnitude();
-    state.mass_slugs = exec.GetMassBalance()->GetMass();
     state.altitude_asl_ft = propagate->GetAltitudeASL();
     for (unsigned i = 0; i < exec.GetPropulsion()->GetNumEngines() && i < state.propulsion_rpm.size(); ++i) {
         state.propulsion_rpm[i] = exec.GetPropertyValue("propulsion/engine[" + std::to_string(i) + "]/propeller-rpm");

@@ -20,7 +20,6 @@ constexpr float TwoPi = 2.0f * Pi;
 constexpr float GravityFtPerSecondSquared = 32.174f;
 constexpr float SeaLevelPressurePsf = 2116.21662f;
 constexpr float AtmosphericScaleHeightFt = 27672.2f;
-constexpr float ComplementaryGyroWeight = 0.995f;
 constexpr float MinimumAccelerationSquared = 1.0e-6f;
 constexpr float HoverThrottle = 0.35f;
 constexpr float HorizontalTargetSpeedFtPerSecond = 4.0f;
@@ -29,6 +28,9 @@ constexpr float YawTargetRateRadiansPerSecond = 45.0f * Pi / 180.0f;
 constexpr float MaximumTiltRadians = 10.0f * Pi / 180.0f;
 constexpr float LevelRecoveryToleranceRadians = 3.0f * Pi / 180.0f;
 constexpr float LevelRecoveryRateToleranceRadiansPerSecond = 10.0f * Pi / 180.0f;
+constexpr int GravityInitializationSamples = 12;
+constexpr float MinimumGravitySampleFtPerSecondSquared = 0.8f * GravityFtPerSecondSquared;
+constexpr float MaximumGravitySampleFtPerSecondSquared = 1.2f * GravityFtPerSecondSquared;
 
 constexpr PidConfig PositionPidConfig{0.45f, 0.0f, 0.0f, 0.0f, 0.0f, -5.0f, 5.0f};
 constexpr PidConfig VelocityPidConfig{0.90f, 0.0f, 0.0f, 0.0f, 0.0f, -5.0f, 5.0f};
@@ -43,11 +45,6 @@ float KeyAxis(bool positive, bool negative) {
 }
 
 float WrapAngle(float angle) { return std::remainder(angle, TwoPi); }
-
-float BlendAngle(float estimate, float measurement) {
-    return WrapAngle(estimate + (1.0f - ComplementaryGyroWeight)
-        * WrapAngle(measurement - estimate));
-}
 
 float BarometricAltitudeFt(const BarometerSample &barometer) {
     return -AtmosphericScaleHeightFt * std::log(barometer.pressure_psf / SeaLevelPressurePsf);
@@ -95,15 +92,19 @@ void PositionHoldController::Reset() {
     pitch_rad_ = 0.0f;
     roll_rad_ = 0.0f;
     yaw_rad_ = 0.0f;
+    body_to_ned_ = {};
+    accelerometer_sample_sum_ = {};
+    accelerometer_sample_count_ = 0;
     attitude_initialized_ = false;
     position_hold_initialized_ = false;
 }
 
 void PositionHoldController::Update(const ControllerInput &input, ControllerOutput &output) {
     if (input.timestep_seconds <= 0.0f) return;
-    if (!attitude_initialized_) InitializeLevelFromGravity(input);
     if (!attitude_initialized_) {
+        // Specific force measures gravity only while its magnitude is near one g.
         MixMotorTargets(output, HoverThrottle, 0.0f, 0.0f, 0.0f);
+        CollectAccelerometerInitializationSample(input);
         return;
     }
 
@@ -165,19 +166,36 @@ void PositionHoldController::CaptureTarget(const ControllerInput &input) {
     target_heading_rad_ = MagneticHeading(input.magnetometer);
 }
 
-void PositionHoldController::InitializeLevelFromGravity(const ControllerInput &input) {
+void PositionHoldController::CollectAccelerometerInitializationSample(const ControllerInput &input) {
     const SensorVector3 &acceleration = input.imu.body_specific_force_ft_per_second_squared;
     const float acceleration_squared = acceleration.x * acceleration.x
         + acceleration.y * acceleration.y + acceleration.z * acceleration.z;
     if (acceleration_squared <= MinimumAccelerationSquared) return;
+    const float acceleration_magnitude = std::sqrt(acceleration_squared);
+    if (acceleration_magnitude < MinimumGravitySampleFtPerSecondSquared
+        || acceleration_magnitude > MaximumGravitySampleFtPerSecondSquared) return;
 
-    // At rest, specific force points opposite gravity.  Its negative is down in the
-    // aircraft's forward-right-down frame, which establishes the initial level attitude.
-    pitch_rad_ = std::atan2(-acceleration.x,
-        std::sqrt(acceleration.y * acceleration.y + acceleration.z * acceleration.z));
-    roll_rad_ = std::atan2(acceleration.y, -acceleration.z);
+    accelerometer_sample_sum_.x += acceleration.x;
+    accelerometer_sample_sum_.y += acceleration.y;
+    accelerometer_sample_sum_.z += acceleration.z;
+    ++accelerometer_sample_count_;
+    if (accelerometer_sample_count_ < GravityInitializationSamples) return;
+
+    const double inverse_sample_count = 1.0 / accelerometer_sample_count_;
+    const double specific_force_x = accelerometer_sample_sum_.x * inverse_sample_count;
+    const double specific_force_y = accelerometer_sample_sum_.y * inverse_sample_count;
+    const double specific_force_z = accelerometer_sample_sum_.z * inverse_sample_count;
+
+    // An accelerometer measures specific force, which is opposite gravity at hover.
+    pitch_rad_ = std::atan2(specific_force_x,
+        std::sqrt(specific_force_y * specific_force_y + specific_force_z * specific_force_z));
+    roll_rad_ = std::atan2(-specific_force_y, -specific_force_z);
     target_heading_rad_ = MagneticHeading(input.magnetometer);
     yaw_rad_ = target_heading_rad_;
+    body_to_ned_ = NormalizeQuaternion(MultiplyQuaternions(
+        MultiplyQuaternions(QuaternionFromRotationVector({0.0, 0.0, yaw_rad_}),
+                            QuaternionFromRotationVector({0.0, pitch_rad_, 0.0})),
+        QuaternionFromRotationVector({roll_rad_, 0.0, 0.0})));
     attitude_initialized_ = true;
 }
 
@@ -201,19 +219,20 @@ bool PositionHoldController::RecoverLevel(const ControllerInput &input, Controll
 void PositionHoldController::UpdateAttitudeEstimate(const ControllerInput &input) {
     const float timestep = input.timestep_seconds;
     const SensorVector3 &gyro = input.imu.body_gyro_rad_per_second;
-    const SensorVector3 &acceleration = input.imu.body_specific_force_ft_per_second_squared;
-    pitch_rad_ = WrapAngle(pitch_rad_ + gyro.y * timestep);
-    roll_rad_ = WrapAngle(roll_rad_ + gyro.x * timestep);
-    yaw_rad_ = WrapAngle(yaw_rad_ + gyro.z * timestep);
+    body_to_ned_ = NormalizeQuaternion(MultiplyQuaternions(body_to_ned_,
+        QuaternionFromRotationVector({gyro.x * timestep, gyro.y * timestep, gyro.z * timestep})));
 
-    const float acceleration_squared = acceleration.x * acceleration.x
-        + acceleration.y * acceleration.y + acceleration.z * acceleration.z;
-    if (acceleration_squared > MinimumAccelerationSquared) {
-        const float measured_pitch = std::atan2(-acceleration.x,
-            std::sqrt(acceleration.y * acceleration.y + acceleration.z * acceleration.z));
-        const float measured_roll = std::atan2(acceleration.y, -acceleration.z);
-        pitch_rad_ = BlendAngle(pitch_rad_, measured_pitch);
-        roll_rad_ = BlendAngle(roll_rad_, measured_roll);
-    }
-    yaw_rad_ = BlendAngle(yaw_rad_, MagneticHeading(input.magnetometer));
+    const double roll_sine_cosine = 2.0 * (body_to_ned_.w * body_to_ned_.x
+        + body_to_ned_.y * body_to_ned_.z);
+    const double roll_cosine_cosine = 1.0 - 2.0 * (body_to_ned_.x * body_to_ned_.x
+        + body_to_ned_.y * body_to_ned_.y);
+    const double pitch_sine = std::clamp(2.0 * (body_to_ned_.w * body_to_ned_.y
+        - body_to_ned_.z * body_to_ned_.x), -1.0, 1.0);
+    const double yaw_sine_cosine = 2.0 * (body_to_ned_.w * body_to_ned_.z
+        + body_to_ned_.x * body_to_ned_.y);
+    const double yaw_cosine_cosine = 1.0 - 2.0 * (body_to_ned_.y * body_to_ned_.y
+        + body_to_ned_.z * body_to_ned_.z);
+    roll_rad_ = static_cast<float>(std::atan2(roll_sine_cosine, roll_cosine_cosine));
+    pitch_rad_ = static_cast<float>(std::asin(pitch_sine));
+    yaw_rad_ = static_cast<float>(std::atan2(yaw_sine_cosine, yaw_cosine_cosine));
 }
