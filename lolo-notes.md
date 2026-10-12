@@ -2,7 +2,10 @@
 
 ## Current state
 
-JSBSim 1.3.2 has replaced Jolt, including ground reactions. F450 quadcopter and C172 are selectable at startup or with `--aircraft f450|c172`. Both currently offer ManualController.
+JSBSim 1.3.2 has replaced Jolt, including ground reactions. F450 quadcopter and C172 are selectable at startup or with `--aircraft f450|c172`.
+
+- F450 is a four-rotor quadcopter. Its demo controller writes one normalized command to each motor directly. There is no simulator mixer or stabilizer.
+- C172 is a small fixed-wing propeller plane. Its temporary direct controller writes throttle plus aileron, elevator, rudder, flap, and brake commands; it does not stabilize the aircraft.
 
 OpenGL draws representative aircraft parts, with pose, propellers and hinged surfaces driven by JSBSim. ImGui shows physics and programmable sensor readings. Backend smoke checks and offscreen rendering checks passed; this is not full model/controller validation.
 
@@ -11,7 +14,7 @@ OpenGL draws representative aircraft parts, with pose, propellers and hinged sur
 - `src/aircraft/`: one AircraftDefinition owns each aircraft's model, initial conditions, integration settings, graphics references, control bindings and available controllers. Drones and planes use the same system.
 - `src/physics/`: JSBSim backend and native aircraft state.
 - `src/sensors/`: programmable ideal IMU, local GPS, barometer and magnetometer.
-- `src/controllers/`: one ControllerInput / ControllerOutput contract and ManualController. Original controller algorithms remain untouched and excluded from the build.
+- `src/controllers/`: one ControllerInput / ControllerOutput contract plus the active F450 demo and C172 direct controllers. Original controller algorithms remain untouched and excluded from the build.
 - `src/app/`: startup selection, fixed-step loop, SDL window, camera, ImGui and OpenGL. `src/main.cpp` launches interactive or headless mode.
 
 The old `src/drones/` files were removed; any remaining folders are empty leftovers. Custom drone declarations are recoverable through Git history, not ported JSBSim aircraft.
@@ -30,7 +33,7 @@ flowchart TD
     backend -->|"Native state"| state["src/physics/aircraft_state.hpp"]
     state --> sensors["src/sensors/ideal_*.cpp"]
     sensors -->|"Samples: ControllerInput"| io["src/controllers/include/controllers/controller_io.hpp"]
-    io --> controller["src/controllers/manual_controller.cpp"]
+    io --> controller["src/controllers/{demo,c172_direct}_controller.cpp"]
     controller -->|"ControllerOutput via Simulation"| backend
     sim -->|"Render state"| renderer["src/app/renderer.cpp"]
     definition -->|"Visual parts"| renderer
@@ -44,9 +47,9 @@ Physics and sensors keep native units: feet, ft/s, ft/s², psf, slugs and radian
 
 Rendering also uses feet, mapping axes to X right, Y up, -Z forward. Ground reactions are JSBSim only; visual meshes do not provide arbitrary collisions.
 
-The configurable controller/sensor tick defaults to 60 Hz. Each aircraft owns a smaller maximum internal physics interval where needed; commands are held across substeps. Reset restores starting physics, sensors and manual controller state.
+The configurable controller/sensor tick defaults to 60 Hz. Each aircraft owns a smaller maximum internal physics interval where needed; commands are held across substeps. Reset restores starting physics, sensors and controller state.
 
-Manual is a normal controller. F450 currently uses its bundled stabilization/mixer; C172 uses standard surface commands. Indexed motor commands exist in the unified output but are not connected to JSBSim yet.
+Each aircraft declares the controllers it can run. The F450 demo writes its four indexed motor commands through the unified output; the C172 direct controller writes named fixed-wing actuator commands. JSBSim's stock F450 SCAS and C172 autopilots are disabled.
 
 ## Build and run
 
@@ -58,12 +61,6 @@ ctest --test-dir build --output-on-failure
 ```
 
 CMake downloads dependencies and copies JSBSim model data to `build/jsbsim-data`; its configured path works independently of the launch directory. See README for keyboard controls and direct aircraft/headless launch flags.
-
-## Next step: approval required
-
-Migration stages 1–5 are complete. Do not adapt existing controllers until the user explicitly approves. Review controllers individually, then custom aircraft declarations.
-
-The next proposed choice is F450 direct-motor control versus using its bundled stabilization/mixer. Direct motors would let existing controllers own stabilization and mixing, but motor order, directions and bindings must first be checked. This choice is not approved yet.
 
 ## Limitations and deferred ideas
 

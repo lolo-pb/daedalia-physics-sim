@@ -25,13 +25,13 @@ void ManualController::Update(const ControllerInput &input, ControllerOutput &ou
     flaps_ = std::clamp(flaps_ + 0.5f * input.timestep_seconds * Axis(keys.g, keys.h), 0.0f, 1.0f);
     if (output.GetMotorCount() == 4) {
         MixQuadcopter(output, throttle_, Axis(keys.s, keys.w) * 0.15f,
-                       Axis(keys.d, keys.a) * 0.15f, Axis(keys.e, keys.q) * 0.10f);
+                      Axis(keys.d, keys.a) * 0.15f, Axis(keys.e, keys.q) * 0.10f);
         return;
     }
     output.throttle = throttle_;
-    output.roll = Axis(keys.d, keys.a);
-    output.pitch = Axis(keys.s, keys.w);
-    output.yaw = Axis(keys.e, keys.q);
+    output.aileron = Axis(keys.d, keys.a);
+    output.elevator = Axis(keys.s, keys.w);
+    output.rudder = Axis(keys.e, keys.q);
     output.flaps = flaps_;
     output.left_brake = output.right_brake = keys.b ? 1.0f : 0.0f;
 }

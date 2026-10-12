@@ -1,6 +1,17 @@
 #include "ui.hpp"
+#include <string>
 #include <imgui.h>
 #include "simulation.hpp"
+
+namespace {
+const char *ControllerName(ControllerType type) {
+    switch (type) {
+    case ControllerType::F450Demo: return "F450 demo";
+    case ControllerType::C172Direct: return "C172 direct";
+    }
+    return "Unknown";
+}
+}
 
 PhysicsPanelResult DrawPhysicsPanel(Simulation &simulation, bool &paused,
                                     bool &single_step, bool &follow_drone) {
@@ -10,14 +21,19 @@ PhysicsPanelResult DrawPhysicsPanel(Simulation &simulation, bool &paused,
     ImGui::TextUnformatted(definition.display_name.data());
     ImGui::SeparatorText("Controller");
     for (std::size_t i = 0; i < definition.available_controllers.size(); ++i) {
-        if (ImGui::RadioButton("1 Manual", simulation.GetActiveController() == definition.available_controllers[i])) {
+        const std::string label = std::to_string(i + 1) + " " + ControllerName(definition.available_controllers[i]);
+        if (ImGui::RadioButton(label.c_str(), simulation.GetActiveController() == definition.available_controllers[i])) {
             simulation.SelectController(static_cast<int>(i + 1));
         }
     }
-    ImGui::Text("Throttle: %.3f", simulation.GetActiveControllerThrottle());
-    ImGui::TextUnformatted("W/S pitch, A/D roll, Q/E yaw, R/F throttle");
-    if (!definition.motor_properties.empty()) ImGui::TextUnformatted("Raw motor mix; no simulator stabilization");
-    ImGui::TextUnformatted("G/H flaps, hold B for brakes");
+    if (simulation.GetActiveController() == ControllerType::F450Demo) {
+        ImGui::TextUnformatted("X: arm/disarm all four raw motor commands (0.8)");
+        ImGui::TextUnformatted("No mixer or stabilization is supplied by the simulator");
+    } else {
+        ImGui::Text("Throttle: %.3f", simulation.GetActiveControllerThrottle());
+        ImGui::TextUnformatted("W/S elevator, A/D aileron, Q/E rudder, R/F throttle");
+        ImGui::TextUnformatted("G/H flaps, hold B for brakes");
+    }
     ImGui::TextUnformatted("Hold right mouse for camera controls");
     ImGui::SeparatorText("Simulation");
     if (ImGui::Button(paused ? "Resume" : "Pause")) paused = !paused;
@@ -40,7 +56,7 @@ PhysicsPanelResult DrawPhysicsPanel(Simulation &simulation, bool &paused,
     ImGui::Text("Gravity: %.3f ft/s^2", state.gravity_ft_per_second_squared);
     ImGui::Text("Altitude ASL: %.3f ft", state.altitude_asl_ft);
     const auto &commands = simulation.GetLatestCommands();
-    ImGui::Text("Roll/pitch/yaw commands: %.2f, %.2f, %.2f", commands.roll, commands.pitch, commands.yaw);
+    ImGui::Text("Aileron/elevator/rudder: %.2f, %.2f, %.2f", commands.aileron, commands.elevator, commands.rudder);
     ImGui::Text("Flaps: %.2f  Brakes: %.2f / %.2f", commands.flaps, commands.left_brake, commands.right_brake);
     ImGui::End();
     return result;

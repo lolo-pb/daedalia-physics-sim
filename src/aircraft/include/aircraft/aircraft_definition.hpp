@@ -6,7 +6,7 @@
 #include <string_view>
 
 enum class AircraftType { F450, C172 };
-enum class ControllerType { Manual };
+enum class ControllerType { F450Demo, C172Direct, Manual };
 enum class VisualPartMotion { Fixed, Rotor, LeftAileron, RightAileron, Elevator, Rudder, Flap };
 
 struct AircraftVisualPart {

@@ -71,7 +71,8 @@ target_link_libraries(imgui PRIVATE SDL3::SDL3 glad OpenGL::GL)
 find_package(OpenGL REQUIRED)
 
 add_library(controller STATIC
-    src/controllers/manual_controller.cpp
+    src/controllers/c172_direct_controller.cpp
+    src/controllers/demo_controller.cpp
 )
 target_include_directories(controller PUBLIC
     src/controllers/include

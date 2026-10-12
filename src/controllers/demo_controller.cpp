@@ -1,5 +1,10 @@
 #include "controllers/demo_controller.hpp"
 
+void DemoController::Reset() {
+  armed_ = false;
+  x_was_down_ = false;
+}
+
 void DemoController::Update(
     const ControllerInput &input,
     MotorCommands &motor_commands) {

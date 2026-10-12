@@ -7,14 +7,14 @@
 
 #include "sensors/sensor_types.hpp"
 
-// Single command contract for all controllers. Motor mapping is reserved for
-// the later, approved legacy-controller integration.
+// Single command contract for all controllers. Aircraft controllers write their
+// own actuators: motors for rotorcraft and surfaces for fixed-wing aircraft.
 class ControllerOutput {
 public:
     explicit ControllerOutput(std::size_t motor_count = 0) : motors_(motor_count) {}
     void Clear() {
         std::fill(motors_.begin(), motors_.end(), 0.0f);
-        throttle = roll = pitch = yaw = flaps = left_brake = right_brake = 0.0f;
+        throttle = aileron = elevator = rudder = flaps = left_brake = right_brake = 0.0f;
     }
     void SetMotor(std::size_t index, float target) {
         if (index < motors_.size()) motors_[index] = Bound(target, 0.0f, 1.0f);
@@ -25,17 +25,17 @@ public:
     std::size_t GetMotorCount() const { return motors_.size(); }
     void Normalize() {
         throttle = Bound(throttle, 0, 1);
-        roll = Bound(roll, -1, 1);
-        pitch = Bound(pitch, -1, 1);
-        yaw = Bound(yaw, -1, 1);
+        aileron = Bound(aileron, -1, 1);
+        elevator = Bound(elevator, -1, 1);
+        rudder = Bound(rudder, -1, 1);
         flaps = Bound(flaps, 0, 1);
         left_brake = Bound(left_brake, 0, 1);
         right_brake = Bound(right_brake, 0, 1);
     }
     float throttle = 0.0f;
-    float roll = 0.0f;
-    float pitch = 0.0f;
-    float yaw = 0.0f;
+    float aileron = 0.0f;
+    float elevator = 0.0f;
+    float rudder = 0.0f;
     float flaps = 0.0f;
     float left_brake = 0.0f;
     float right_brake = 0.0f;

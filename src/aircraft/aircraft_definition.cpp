@@ -5,7 +5,8 @@
 
 namespace {
 
-constexpr std::array Controllers{ControllerType::Manual};
+constexpr std::array F450Controllers{ControllerType::F450Demo};
+constexpr std::array C172Controllers{ControllerType::C172Direct};
 constexpr std::array<std::string_view, 7> Controls{
     "fcs/throttle-cmd-norm", "fcs/aileron-cmd-norm", "fcs/elevator-cmd-norm",
     "fcs/rudder-cmd-norm", "fcs/flap-cmd-norm",
@@ -52,8 +53,8 @@ constexpr std::array<AircraftVisualPart, 14> C172Parts{{
 }};
 
 const std::array<AircraftDefinition, 2> Aircraft{{
-    {AircraftType::F450, "f450", "F450 quadcopter", "F450", 0.55, 0, 0, 7, false, 0.002, Controls, F450Motors, F450DisabledSimulatorControls, F450Parts, Controllers},
-    {AircraftType::C172, "c172", "Cessna 172", "c172x", 4.75, 0, 0, 65, true, 1.0 / 120, Controls, NoMotors, C172DisabledSimulatorControls, C172Parts, Controllers},
+    {AircraftType::F450, "f450", "F450 quadcopter", "F450", 0.55, 0, 0, 7, false, 0.002, Controls, F450Motors, F450DisabledSimulatorControls, F450Parts, F450Controllers},
+    {AircraftType::C172, "c172", "Cessna 172", "c172x", 4.75, 0, 0, 65, true, 1.0 / 120, Controls, NoMotors, C172DisabledSimulatorControls, C172Parts, C172Controllers},
 }};
 
 } // namespace

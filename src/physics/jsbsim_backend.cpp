@@ -89,7 +89,7 @@ void JsbsimBackend::SetTimestep(double seconds) {
 }
 
 void JsbsimBackend::Step(const ControllerOutput &commands) {
-    const std::array<double, 7> values{commands.throttle, commands.roll, commands.pitch, commands.yaw,
+    const std::array<double, 7> values{commands.throttle, commands.aileron, commands.elevator, commands.rudder,
                                       commands.flaps, commands.left_brake, commands.right_brake};
     for (std::size_t i = 0; i < values.size(); ++i) {
         impl_->exec.SetPropertyValue(std::string(definition_.control_properties[i]), values[i]);

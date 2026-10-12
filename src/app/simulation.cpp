@@ -7,7 +7,8 @@
 #include <numbers>
 #include <stdexcept>
 
-#include "controllers/manual_controller.hpp"
+#include "controllers/c172_direct_controller.hpp"
+#include "controllers/demo_controller.hpp"
 #include "physics/jsbsim_backend.hpp"
 #include "sensors/ideal_imu.hpp"
 #include "sensors/ideal_gps.hpp"
@@ -25,8 +26,9 @@ bool Finite(const glm::dvec3 &v) { return std::isfinite(v.x) && std::isfinite(v.
 struct Simulation::Impl {
     const AircraftDefinition &definition;
     JsbsimBackend backend;
-    ManualController manual;
-    ControllerType active = ControllerType::Manual;
+    DemoController f450_demo;
+    C172DirectController c172_direct;
+    ControllerType active = ControllerType::F450Demo;
     ControllerOutput commands;
     AircraftState state;
     IdealImuModel imu;
@@ -64,7 +66,8 @@ void Simulation::SelectController(int slot) {
     const auto selected = controllers[slot - 1];
     if (selected == impl_->active) return;
     impl_->active = selected;
-    impl_->manual.Reset();
+    impl_->f450_demo.Reset();
+    impl_->c172_direct.Reset();
     impl_->commands.Clear();
 }
 
@@ -72,7 +75,14 @@ void Simulation::Step(const ControllerKeys &keys) {
     const ControllerInput input{impl_->imu_sample, impl_->gps_sample, impl_->barometer_sample,
                                 impl_->magnetometer_sample, static_cast<float>(GetPhysicsStepSeconds()), keys};
     impl_->commands.Clear();
-    impl_->manual.Update(input, impl_->commands);
+    switch (impl_->active) {
+    case ControllerType::F450Demo:
+        impl_->f450_demo.Update(input, impl_->commands);
+        break;
+    case ControllerType::C172Direct:
+        impl_->c172_direct.Update(input, impl_->commands);
+        break;
+    }
     impl_->commands.Normalize();
     const auto previous_rpm = impl_->state.propulsion_rpm;
     impl_->backend.Step(impl_->commands);
@@ -86,14 +96,18 @@ void Simulation::Step(const ControllerKeys &keys) {
 
 void Simulation::Reset() {
     impl_->backend.Reset(GetPhysicsStepSeconds());
-    impl_->manual.Reset();
+    impl_->f450_demo.Reset();
+    impl_->c172_direct.Reset();
     impl_->commands.Clear();
     impl_->rotor_angles.fill(0);
     impl_->Refresh();
 }
 
 ControllerType Simulation::GetActiveController() const { return impl_->active; }
-float Simulation::GetActiveControllerThrottle() const { return impl_->manual.GetThrottle(); }
+float Simulation::GetActiveControllerThrottle() const {
+    if (impl_->active == ControllerType::C172Direct) return impl_->c172_direct.GetThrottle();
+    return 0.0f;
+}
 const ControllerOutput &Simulation::GetLatestCommands() const { return impl_->commands; }
 const AircraftDefinition &Simulation::GetAircraftDefinition() const { return impl_->definition; }
 int Simulation::GetPhysicsFrequencyHz() const { return impl_->frequency_hz; }
@@ -134,12 +148,19 @@ int Simulation::RunSmokeTest() {
     if (impl_->definition.motor_properties.empty()) keys.d = keys.g = true;
     for (int i = 0; i < 30; ++i) { Step(keys); valid = valid && check_state(); }
     if (impl_->definition.motor_properties.empty()) {
-        valid = valid && impl_->commands.throttle > 0 && impl_->commands.roll == 1 && impl_->commands.flaps > 0;
+        valid = valid && impl_->commands.throttle > 0 && impl_->commands.aileron == 1 && impl_->commands.flaps > 0;
     } else {
-        valid = valid && impl_->commands.throttle == 0 && impl_->commands.roll == 0
-            && impl_->commands.pitch == 0 && impl_->commands.yaw == 0
+        valid = valid && impl_->commands.throttle == 0 && impl_->commands.aileron == 0
+            && impl_->commands.elevator == 0 && impl_->commands.rudder == 0
             && impl_->commands.GetMotorCount() == impl_->definition.motor_properties.size()
-            && impl_->commands.GetMotor(0) > 0;
+            && impl_->commands.GetMotor(0) == 0;
+        ControllerKeys arm;
+        arm.x = true;
+        Step(arm);
+        valid = valid && impl_->commands.GetMotor(0) == 0.8f
+            && impl_->commands.GetMotor(1) == 0.8f
+            && impl_->commands.GetMotor(2) == 0.8f
+            && impl_->commands.GetMotor(3) == 0.8f;
     }
     std::printf("%.*s: altitude=%.3f ft, throttle=%.3f, motor0=%.3f, rpm=%.3f, aileron=%.3f rad, flap=%.3f rad\n",
         static_cast<int>(impl_->definition.command_name.size()), impl_->definition.command_name.data(),

@@ -2,6 +2,8 @@
 
 #include "controllers/controller_io.hpp"
 
+// Generic keyboard controller retained as an optional controller for either
+// aircraft. On rotorcraft it owns the keyboard-to-motor mixer.
 class ManualController {
 public:
     void Reset();

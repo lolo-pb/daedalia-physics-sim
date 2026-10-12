@@ -4,6 +4,7 @@
 
 class DemoController {
 public:
+  void Reset();
   void Update(const ControllerInput &input, MotorCommands &motor_commands);
 
 private:
