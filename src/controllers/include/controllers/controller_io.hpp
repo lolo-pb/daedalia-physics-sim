@@ -22,6 +22,7 @@ public:
     float GetMotor(std::size_t index) const {
         return index < motors_.size() ? motors_[index] : 0.0f;
     }
+    std::size_t GetMotorCount() const { return motors_.size(); }
     void Normalize() {
         throttle = Bound(throttle, 0, 1);
         roll = Bound(roll, -1, 1);

@@ -16,6 +16,7 @@ PhysicsPanelResult DrawPhysicsPanel(Simulation &simulation, bool &paused,
     }
     ImGui::Text("Throttle: %.3f", simulation.GetActiveControllerThrottle());
     ImGui::TextUnformatted("W/S pitch, A/D roll, Q/E yaw, R/F throttle");
+    if (!definition.motor_properties.empty()) ImGui::TextUnformatted("Raw motor mix; no simulator stabilization");
     ImGui::TextUnformatted("G/H flaps, hold B for brakes");
     ImGui::TextUnformatted("Hold right mouse for camera controls");
     ImGui::SeparatorText("Simulation");

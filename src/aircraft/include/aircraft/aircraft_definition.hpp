@@ -30,10 +30,11 @@ struct AircraftDefinition {
     double latitude_deg;
     double longitude_deg;
     float camera_distance_ft;
-    std::string_view stabilization_property;
     bool initialize_running;
     double max_integration_step_seconds;
     std::array<std::string_view, 7> control_properties;
+    std::span<const std::string_view> motor_properties;
+    std::span<const std::string_view> simulator_control_disable_properties;
     std::span<const AircraftVisualPart> visual_parts;
     std::span<const ControllerType> available_controllers;
 };

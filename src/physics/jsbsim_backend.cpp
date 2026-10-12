@@ -61,14 +61,22 @@ struct JsbsimBackend::Impl {
                 throw std::runtime_error("JSBSim control property missing: " + std::string(property));
             }
         }
+        for (const auto property : definition.motor_properties) {
+            if (!exec.GetPropertyManager()->HasNode(std::string(property))) {
+                throw std::runtime_error("JSBSim motor property missing: " + std::string(property));
+            }
+        }
+        for (const auto property : definition.simulator_control_disable_properties) {
+            if (!exec.GetPropertyManager()->HasNode(std::string(property))) {
+                throw std::runtime_error("JSBSim simulator-control property missing: " + std::string(property));
+            }
+            exec.SetPropertyValue(std::string(property), 0);
+        }
         // Piston engines need starting. Electric motors run from throttle directly;
         // JSBSim's 0.5-second steady-state starter step is unsuitable for the F450.
         if (definition.initialize_running) exec.GetPropulsion()->InitRunning(-1);
         exec.GetFCS()->SetThrottleCmd(-1, 0);
         exec.GetFCS()->SetThrottlePos(-1, 0);
-        if (!definition.stabilization_property.empty()) {
-            exec.SetPropertyValue(std::string(definition.stabilization_property), 1);
-        }
     }
 };
 
@@ -85,6 +93,9 @@ void JsbsimBackend::Step(const ControllerOutput &commands) {
                                       commands.flaps, commands.left_brake, commands.right_brake};
     for (std::size_t i = 0; i < values.size(); ++i) {
         impl_->exec.SetPropertyValue(std::string(definition_.control_properties[i]), values[i]);
+    }
+    for (std::size_t i = 0; i < definition_.motor_properties.size(); ++i) {
+        impl_->exec.SetPropertyValue(std::string(definition_.motor_properties[i]), commands.GetMotor(i));
     }
     for (int i = 0; i < impl_->integration_steps; ++i) {
         if (!impl_->exec.Run()) throw std::runtime_error("JSBSim simulation step failed");

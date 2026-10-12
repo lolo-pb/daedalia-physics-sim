@@ -20,7 +20,7 @@ Aircraft XML, engines and systems are copied into `build/jsbsim-data`. The execu
 
 ## Controls
 
-The currently available controller is Manual, selected from the aircraft's controller list. F450 manual operation uses its supplied JSBSim rate stabilization and mixer. C172 commands its standard control surfaces.
+The currently available controller is Manual, selected from the aircraft's controller list. It owns every actuator command: F450 uses a raw four-motor mix with no rate stabilization, while C172 commands its standard control surfaces. JSBSim provides the aircraft dynamics only; its bundled stabilizers and autopilots are held off.
 
 - W/S pitch, A/D roll, Q/E yaw.
 - R/F increase/decrease throttle (starts at zero).
@@ -46,7 +46,7 @@ The stock F450 XML currently emits a configuration-version warning and duplicate
 
 Controllers receive sensor samples, not the ground-truth object. Ground truth remains available to the backend, sensors, renderer and debug UI.
 
-Existing controller implementations remain in the repository but are excluded from the build and selection. Their sensor names, units, motor mapping and tuning await individual review. Indexed motor commands are reserved in the unified output contract; their JSBSim binding is deferred until that review.
+Existing controller implementations remain in the repository but are excluded from the build and selection. Their sensor names, units, motor mapping and tuning await individual review. F450's indexed motor commands are bound directly to its external ESC inputs; other aircraft can expose their own actuator bindings through AircraftDefinition.
 
 ## Focused backend checks
 

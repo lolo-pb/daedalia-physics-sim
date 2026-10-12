@@ -11,6 +11,16 @@ constexpr std::array<std::string_view, 7> Controls{
     "fcs/rudder-cmd-norm", "fcs/flap-cmd-norm",
     "fcs/left-brake-cmd-norm", "fcs/right-brake-cmd-norm",
 };
+constexpr std::array<std::string_view, 4> F450Motors{
+    "fcs/cmdFR_ext_nd", "fcs/cmdAL_ext_nd", "fcs/cmdFL_ext_nd", "fcs/cmdAR_ext_nd",
+};
+constexpr std::array<std::string_view, 1> F450DisabledSimulatorControls{
+    "fcs/ScasEngage",
+};
+constexpr std::array<std::string_view, 4> C172DisabledSimulatorControls{
+    "ap/attitude_hold", "ap/altitude_hold", "ap/heading_hold", "ap/airspeed_hold",
+};
+constexpr std::array<std::string_view, 0> NoMotors{};
 
 constexpr std::array<AircraftVisualPart, 9> F450Parts{{
     {{0,0,0}, {0.4f,0.16f,0.5f}, {0.85f,0.35f,0.15f}},
@@ -42,8 +52,8 @@ constexpr std::array<AircraftVisualPart, 14> C172Parts{{
 }};
 
 const std::array<AircraftDefinition, 2> Aircraft{{
-    {AircraftType::F450, "f450", "F450 quadcopter", "F450", 0.55, 0, 0, 7, "fcs/ScasEngage", false, 0.002, Controls, F450Parts, Controllers},
-    {AircraftType::C172, "c172", "Cessna 172", "c172x", 4.75, 0, 0, 65, "", true, 1.0 / 120, Controls, C172Parts, Controllers},
+    {AircraftType::F450, "f450", "F450 quadcopter", "F450", 0.55, 0, 0, 7, false, 0.002, Controls, F450Motors, F450DisabledSimulatorControls, F450Parts, Controllers},
+    {AircraftType::C172, "c172", "Cessna 172", "c172x", 4.75, 0, 0, 65, true, 1.0 / 120, Controls, NoMotors, C172DisabledSimulatorControls, C172Parts, Controllers},
 }};
 
 } // namespace

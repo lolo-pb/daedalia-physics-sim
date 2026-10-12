@@ -40,7 +40,8 @@ struct Simulation::Impl {
     std::array<double, 4> rotor_angles{};
     int frequency_hz = 60;
 
-    explicit Impl(const AircraftDefinition &aircraft) : definition(aircraft), backend(aircraft) {
+    explicit Impl(const AircraftDefinition &aircraft)
+        : definition(aircraft), backend(aircraft), commands(aircraft.motor_properties.size()) {
         if (definition.available_controllers.empty()) throw std::runtime_error("Aircraft has no controllers");
         active = definition.available_controllers.front();
         Refresh();
@@ -129,13 +130,21 @@ int Simulation::RunSmokeTest() {
     bool valid = check_state();
     for (int i = 0; i < 120; ++i) { Step({}); valid = valid && check_state(); }
     ControllerKeys keys;
-    keys.r = keys.d = keys.g = true;
+    keys.r = true;
+    if (impl_->definition.motor_properties.empty()) keys.d = keys.g = true;
     for (int i = 0; i < 30; ++i) { Step(keys); valid = valid && check_state(); }
-    valid = valid && impl_->commands.throttle > 0 && impl_->commands.roll == 1 && impl_->commands.flaps > 0;
-    std::printf("%.*s: altitude=%.3f ft, throttle=%.3f, rpm=%.3f, aileron=%.3f rad, flap=%.3f rad\n",
+    if (impl_->definition.motor_properties.empty()) {
+        valid = valid && impl_->commands.throttle > 0 && impl_->commands.roll == 1 && impl_->commands.flaps > 0;
+    } else {
+        valid = valid && impl_->commands.throttle == 0 && impl_->commands.roll == 0
+            && impl_->commands.pitch == 0 && impl_->commands.yaw == 0
+            && impl_->commands.GetMotorCount() == impl_->definition.motor_properties.size()
+            && impl_->commands.GetMotor(0) > 0;
+    }
+    std::printf("%.*s: altitude=%.3f ft, throttle=%.3f, motor0=%.3f, rpm=%.3f, aileron=%.3f rad, flap=%.3f rad\n",
         static_cast<int>(impl_->definition.command_name.size()), impl_->definition.command_name.data(),
-        impl_->state.altitude_asl_ft, impl_->commands.throttle, impl_->state.propulsion_rpm[0],
-        impl_->state.left_aileron_rad, impl_->state.flap_rad);
+        impl_->state.altitude_asl_ft, impl_->commands.throttle, impl_->commands.GetMotor(0),
+        impl_->state.propulsion_rpm[0], impl_->state.left_aileron_rad, impl_->state.flap_rad);
     SetPhysicsFrequencyHz(120);
     Reset();
     valid = valid && impl_->state.timestamp_seconds == 0 && impl_->commands.throttle == 0
