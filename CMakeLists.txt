@@ -17,12 +17,14 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(SDL3)
 
+set(BUILD_PYTHON_MODULE OFF CACHE BOOL "" FORCE)
+set(BUILD_DOCS OFF CACHE BOOL "" FORCE)
 FetchContent_Declare(
-    JoltPhysics
-    URL https://github.com/jrouwe/JoltPhysics/archive/refs/tags/v5.3.0.tar.gz
-    SOURCE_SUBDIR Build
+    jsbsim
+    URL https://github.com/JSBSim-Team/jsbsim/archive/refs/tags/v1.3.2.tar.gz
 )
-FetchContent_MakeAvailable(JoltPhysics)
+FetchContent_Populate(jsbsim)
+add_subdirectory(${jsbsim_SOURCE_DIR} ${jsbsim_BINARY_DIR} EXCLUDE_FROM_ALL)
 
 FetchContent_Declare(
     glm
@@ -69,14 +71,7 @@ target_link_libraries(imgui PRIVATE SDL3::SDL3 glad OpenGL::GL)
 find_package(OpenGL REQUIRED)
 
 add_library(controller STATIC
-    src/controllers/angle_mode_controller.cpp
-    src/controllers/demo_controller.cpp
-    src/controllers/horizon_mode_controller.cpp
-    src/controllers/pid.cpp
-    src/controllers/position_hold_controller.cpp
-    src/controllers/quaternion.cpp
-    src/controllers/tbc_controller.cpp
-    src/controllers/tricopter_angle_mode_controller.cpp
+    src/controllers/manual_controller.cpp
 )
 target_include_directories(controller PUBLIC
     src/controllers/include
@@ -85,17 +80,14 @@ target_include_directories(controller PUBLIC
 
 add_executable(daedalia
     src/app/application.cpp
-    src/app/drone_selection_menu.cpp
+    src/app/aircraft_selection_menu.cpp
     src/app/renderer.cpp
     src/app/simulation.cpp
     src/app/startup_animation.cpp
     src/app/ui.cpp
     src/main.cpp
-    src/drones/drone.cpp
-    src/drones/drone_definition.cpp
-    src/drones/quadcopter.cpp
-    src/drones/tricopter.cpp
-    src/drones/triangular-bipyramid-copter.cpp
+    src/aircraft/aircraft_definition.cpp
+    src/physics/jsbsim_backend.cpp
     src/sensors/ideal_barometer.cpp
     src/sensors/ideal_gps.cpp
     src/sensors/ideal_imu.cpp
@@ -103,17 +95,22 @@ add_executable(daedalia
 )
 target_include_directories(daedalia PRIVATE
     src
-    src/drones/include
+    src/aircraft/include
 )
-target_link_libraries(daedalia PRIVATE controller SDL3::SDL3 Jolt glm::glm glad imgui OpenGL::GL)
+target_link_libraries(daedalia PRIVATE controller SDL3::SDL3 libJSBSim glm::glm glad imgui OpenGL::GL)
+target_include_directories(daedalia PRIVATE ${jsbsim_SOURCE_DIR}/src ${jsbsim_BINARY_DIR}/src)
+# Keep model data beside the executable rather than relying on its working directory.
+file(COPY ${jsbsim_SOURCE_DIR}/aircraft ${jsbsim_SOURCE_DIR}/engine ${jsbsim_SOURCE_DIR}/systems
+    DESTINATION ${CMAKE_BINARY_DIR}/jsbsim-data)
+target_compile_definitions(daedalia PRIVATE DAEDALIA_JSBSIM_DATA_DIR="${CMAKE_BINARY_DIR}/jsbsim-data")
 
 if(BUILD_TESTING)
     add_test(
-        NAME quadcopter_smoke_test
-        COMMAND daedalia --smoke-test --drone quadcopter
+        NAME f450_backend_smoke_test
+        COMMAND daedalia --smoke-test --aircraft f450
     )
     add_test(
-        NAME tricopter_smoke_test
-        COMMAND daedalia --smoke-test --drone tricopter
+        NAME c172_backend_smoke_test
+        COMMAND daedalia --smoke-test --aircraft c172
     )
 endif()

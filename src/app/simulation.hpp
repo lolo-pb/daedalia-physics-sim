@@ -2,74 +2,43 @@
 
 #include <array>
 #include <memory>
-#include <vector>
-
-#include <Jolt/Jolt.h>
-
+#include "aircraft/aircraft_definition.hpp"
 #include "controllers/controller_io.hpp"
-#include "controllers/controller_selection.hpp"
-#include "sensors/sensor_types.hpp"
+#include "physics/aircraft_state.hpp"
 
-struct DroneDefinition;
-
-class PhysicsRuntime {
-public:
-    PhysicsRuntime();
-    ~PhysicsRuntime();
-
-    PhysicsRuntime(const PhysicsRuntime &) = delete;
-    PhysicsRuntime &operator=(const PhysicsRuntime &) = delete;
-};
-
-struct DroneInspection {
-    JPH::RVec3 position;
-    JPH::Quat rotation;
-    JPH::Vec3 linear_velocity;
-    JPH::Vec3 angular_velocity;
-    float mass = 0.0f;
-};
-
-struct DroneRenderState {
-    JPH::RVec3 position;
-    JPH::Quat rotation;
-    JPH::Vec3 body_half_extent;
-    std::vector<JPH::RVec3> motor_positions;
+struct AircraftRenderState {
+    glm::dvec3 position_ft{};
+    glm::dquat rotation{1.0, 0.0, 0.0, 0.0};
+    double timestamp_seconds = 0.0;
+    std::array<double, 4> rotor_angles_rad{};
+    double left_aileron_rad = 0, right_aileron_rad = 0;
+    double elevator_rad = 0, rudder_rad = 0, flap_rad = 0;
 };
 
 class Simulation {
 public:
-    explicit Simulation(const DroneDefinition &drone_definition);
+    explicit Simulation(const AircraftDefinition &definition);
     ~Simulation();
-
     Simulation(const Simulation &) = delete;
     Simulation &operator=(const Simulation &) = delete;
-
     void SelectController(int slot);
-    void Step(const ControllerKeys &controller_keys);
+    void Step(const ControllerKeys &keys);
     void Reset();
-
     int RunSmokeTest();
-    int RunQuadcopterControlSmokeTest();
-
-    FlightController GetActiveController() const;
+    ControllerType GetActiveController() const;
     float GetActiveControllerThrottle() const;
-
+    const ControllerOutput &GetLatestCommands() const;
+    const AircraftDefinition &GetAircraftDefinition() const;
     int GetPhysicsFrequencyHz() const;
     double GetPhysicsStepSeconds() const;
     void SetPhysicsFrequencyHz(int frequency_hz);
-
-    std::array<float, 3> GetGravity() const;
-    void SetGravity(const std::array<float, 3> &gravity);
-
-    JPH::RVec3 GetDronePosition() const;
-    DroneInspection InspectDrone() const;
-    DroneRenderState GetDroneRenderState() const;
-
+    const AircraftState &InspectAircraft() const;
+    glm::dvec3 GetAircraftPosition() const;
+    AircraftRenderState GetAircraftRenderState() const;
     const ImuSample &GetLatestImuSample() const;
     const GpsSample &GetLatestGpsSample() const;
     const BarometerSample &GetLatestBarometerSample() const;
     const MagnetometerSample &GetLatestMagnetometerSample() const;
-
 private:
     struct Impl;
     std::unique_ptr<Impl> impl_;

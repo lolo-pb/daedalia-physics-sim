@@ -1,4 +1,4 @@
-#include "drone_selection_menu.hpp"
+#include "aircraft_selection_menu.hpp"
 
 #include <algorithm>
 #include <array>
@@ -44,8 +44,8 @@ std::optional<std::size_t> GetSelectionIndex(SDL_Scancode scancode) {
 
 } // namespace
 
-std::optional<DroneType> SelectDroneFromMenu(SDL_Window *window) {
-    const std::span<const DroneOption> options = GetAvailableDroneOptions();
+std::optional<AircraftType> SelectAircraftFromMenu(SDL_Window *window) {
+    const std::span<const AircraftDefinition> options = GetAvailableAircraft();
     const GLboolean depth_test_was_enabled = glIsEnabled(GL_DEPTH_TEST);
     glDisable(GL_DEPTH_TEST);
 
@@ -94,13 +94,13 @@ std::optional<DroneType> SelectDroneFromMenu(SDL_Window *window) {
             | ImGuiWindowFlags_NoMove
             | ImGuiWindowFlags_NoResize
             | ImGuiWindowFlags_NoSavedSettings;
-        ImGui::Begin("Select drone", nullptr, window_flags);
+        ImGui::Begin("Select aircraft", nullptr, window_flags);
         ImGui::TextUnformatted("Choose an aircraft");
         ImGui::Spacing();
 
-        std::optional<DroneType> selected_type;
+        std::optional<AircraftType> selected_type;
         for (std::size_t index = 0; index < options.size(); ++index) {
-            const DroneOption &option = options[index];
+            const AircraftDefinition &option = options[index];
             ImGui::PushID(static_cast<int>(index));
             const std::string label = std::to_string(index + 1)
                 + "  " + std::string(option.display_name);

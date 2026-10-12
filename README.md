@@ -1,79 +1,61 @@
 # Daedalia Physics Sim
 
-Daedalia is a native C++ test bed for programming simulated sensors and flight controllers.
-
-The goal is to experiment with control software against a physical vehicle model: the simulator turns rigid-body state into sensor readings, passes those readings to a controller, and applies the controller's motor commands back to the vehicle. The current vehicle is a quadcopter, but the same approach is intended to support other aircraft, sensor models, and control strategies.
-
-```text
-Jolt physics -> simulated sensors -> flight controller -> motor model -> forces and torques
-```
-
-
-
-https://github.com/user-attachments/assets/55fca39c-678d-4c75-8833-e4cc0290c340
-
-
-
-## Current state
-
-- A Jolt rigid-body simulation running at a configurable fixed frequency.
-- Ideal IMU, local GPS, barometer, and magnetometer models.
-- A controller interface that receives ideal IMU, GPS, barometer, and magnetometer samples.
-- Four normalized motor outputs driving quadcopter thrust and reaction torque.
-- An OpenGL view and ImGui panel for inspecting ground truth, sensor output, and simulation state.
-
-The included controllers provide a constant-throttle demo, angle-limited manual control, unlimited-angle HorizonMode control, and movable position hold.
+A native C++ test bed for programmable sensors and flight controllers, powered by JSBSim 1.3.2. SDL creates the window, OpenGL draws representative aircraft, and ImGui displays simulation and sensor readings.
 
 ## Build and run
 
-Requirements are a C++20 compiler, CMake 3.24 or newer, Python 3, and OpenGL development libraries.
+Requires a C++20 compiler, CMake 3.24+, Python 3 and OpenGL development libraries. CMake downloads JSBSim, SDL, GLM, glad and ImGui on first configuration.
 
 ```sh
 cmake -S . -B build
-cmake --build build
+cmake --build build -j4
 ./build/daedalia
+./build/daedalia --aircraft f450
+./build/daedalia --aircraft c172
 ```
 
-CMake downloads SDL, Jolt Physics, GLM, glad, and Dear ImGui during the first configuration.
+Without an aircraft flag, choose the F450 quadcopter or Cessna 172 in the startup menu. The physics models are bundled JSBSim aircraft, not replicas of the old custom drones. The F450 is the default for headless checks.
 
-Without arguments, the app shows the available-drone menu after the startup animation. Use a flag to select a drone directly while keeping the animation:
-
-```sh
-./build/daedalia --drone quadcopter
-```
-
-Run `./build/daedalia --help` to list available drone names. An unavailable name prints a warning and opens the menu.
-
-Run the headless simulation smoke test with:
-
-```sh
-./build/daedalia --smoke-test --drone quadcopter
-# or through CTest
-ctest --test-dir build --output-on-failure
-```
-
-The smoke test constructs the selected drone and steps the real physics simulation without opening a window. Without `--drone`, it defaults to the quadcopter; an unavailable name prints a warning and also falls back to the quadcopter.
+Aircraft XML, engines and systems are copied into `build/jsbsim-data`. The executable uses an absolute configured data path, so launching from another working directory works. Keep that data directory with the build.
 
 ## Controls
 
-- Hold the right mouse button and move the mouse to look around, or orbit the drone while camera follow is enabled.
-- Use `W`, `A`, `S`, and `D` to move.
-- Use `Space` to rise and `Ctrl` to descend.
-- Hold `Shift` to move faster.
-- Enable `Follow drone` in the `Physics` panel to keep the camera aimed at and moving with the drone.
-- Select controller slot `2` for AngleMode. `W`/`S` command pitch, `A`/`D` command roll, `Q`/`E` change heading, and `R`/`F` change throttle.
-- Select controller slot `3` for HorizonMode. It uses the same controls, but holding pitch or roll continuously rotates the target so flips are possible.
-- Select controller slot `4` for Position Hold. `W`/`S` move the held target forward/backward, `A`/`D` move it sideways, `Q`/`E` change heading, and `R`/`F` change altitude.
+The currently available controller is Manual, selected from the aircraft's controller list. F450 manual operation uses its supplied JSBSim rate stabilization and mixer. C172 commands its standard control surfaces.
 
-The `Physics` panel can pause, reset, or single-step the simulation, set the physics frequency from 1 to 120 Hz, adjust gravity and camera follow, and inspect the drone's ground-truth state. The default physics frequency is 30 Hz.
+- W/S pitch, A/D roll, Q/E yaw.
+- R/F increase/decrease throttle (starts at zero).
+- G/H extend/retract flaps; hold B for brakes.
+- Hold the right mouse button to operate the camera. W/A/S/D move it, Space/Ctrl move vertically, and Shift moves faster.
+- Pause, single-step, reset, camera follow and physics frequency are available in the Physics panel.
 
-The `Sensors` panel shows the latest ideal IMU, GPS, barometer, and magnetometer samples. GPS uses the simulator's local world coordinates, the barometer treats world `Y = 0` as sea level, and magnetic north points along world `-Z`.
+The default simulation/controller/sensor tick is 60 Hz and is configurable from 1 to 240 Hz. JSBSim uses smaller internal integration steps where needed (at most 0.002 seconds for F450 and 1/120 second for C172, following the bundled example scripts). Commands are held through these substeps; sensors publish at the configured tick. Reset restores the on-ground starting pose, ready propulsion, zero commands, sensor readings and controller state.
 
-## Extending the simulator
+## Units and graphics
 
-- Sensor behavior and physics-independent sample types live in `src/sensors/`.
-- Flight controllers and their physics-independent input/output contract live in `src/controllers/`.
-- Vehicle definitions, motors, and force application live in `src/drones/`.
-- `src/app/` owns the fixed-step simulation, application loop, rendering, and debug UI; `src/main.cpp` is the launcher.
+Controller-facing samples use explicitly named native values: feet, feet/second, feet/second squared, pounds-force/square-foot and radians/second. Body axes are forward/right/down; GPS uses local north/east/down. Controllers own conversions needed by their algorithms. The ideal magnetic field is 50 microteslas pointing north.
 
-The position-hold controller is a standalone closed loop that uses only simulated sensor samples; ground truth remains limited to the simulation and debug UI.
+The OpenGL display also uses feet. It maps NED/body axes to X right, Y up, -Z forward for the camera and geometry. The graphics are simple representative parts, with aircraft pose, rotor speeds and hinged surfaces driven by JSBSim state. Ground reactions come entirely from JSBSim; there is no general mesh collision system.
+
+The stock F450 XML currently emits a configuration-version warning and duplicate internal sensor-property binding warnings. Backend stepping and lift-off were checked, but this is not a claim that the supplied model is fully validated. Daedalia's programmable sensors read JSBSim ground truth independently of those internal model sensors.
+
+## Extension points
+
+`src/aircraft/` contains a single `AircraftDefinition` per aircraft. It references the JSBSim model, starting conditions, geometry, command properties and available controllers. Geometry and controller lists can live in referenced files without splitting the aircraft declaration into independent catalogs.
+
+`src/physics/` owns JSBSim and native ground truth. `src/sensors/` turns that state into programmable samples. `src/controllers/` defines the unified `ControllerInput` / `ControllerOutput` contract and the manual controller. `src/app/` owns the window, fixed-step loop, UI and rendering.
+
+Controllers receive sensor samples, not the ground-truth object. Ground truth remains available to the backend, sensors, renderer and debug UI.
+
+Existing controller implementations remain in the repository but are excluded from the build and selection. Their sensor names, units, motor mapping and tuning await individual review. Indexed motor commands are reserved in the unified output contract; their JSBSim binding is deferred until that review.
+
+## Focused backend checks
+
+```sh
+./build/daedalia --smoke-test --aircraft f450
+./build/daedalia --smoke-test --aircraft c172
+ctest --test-dir build --output-on-failure
+```
+
+These check model loading, stepping, finite state, sensor publication, manual commands and reset/frequency changes. They do not assert legacy controller stability.
+
+Migration stages 1–5 are the current scope. Existing-controller adaptations and custom aircraft ports require the next individual review.

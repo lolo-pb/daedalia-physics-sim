@@ -194,7 +194,8 @@ bool Renderer::Initialize() {
 }
 
 void Renderer::DrawScene(
-    const DroneRenderState &drone,
+    const AircraftDefinition &definition,
+    const AircraftRenderState &aircraft,
     const glm::vec3 &camera_position,
     const glm::vec3 &camera_forward,
     int width,
@@ -204,23 +205,36 @@ void Renderer::DrawScene(
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glUseProgram(program_);
 
-    const glm::mat4 projection = glm::perspective(glm::radians(50.0f), static_cast<float>(width) / static_cast<float>(height), 0.1f, 100.0f);
+    const glm::mat4 projection = glm::perspective(glm::radians(50.0f), static_cast<float>(width) / static_cast<float>(height), 0.05f, 10000.0f);
     const glm::mat4 view = glm::lookAt(camera_position, camera_position + camera_forward, glm::vec3(0.0f, 1.0f, 0.0f));
     glUniformMatrix4fv(glGetUniformLocation(program_, "view_projection"), 1, GL_FALSE, glm::value_ptr(projection * view));
     glUniform1i(glGetUniformLocation(program_, "show_grid"), GL_TRUE);
     DrawMesh(plane_, program_, glm::mat4(1.0f), glm::vec3(0.28f, 0.33f, 0.28f));
     glUniform1i(glGetUniformLocation(program_, "show_grid"), GL_FALSE);
 
-    const glm::mat4 transform = glm::translate(glm::mat4(1.0f), glm::vec3(drone.position.GetX(), drone.position.GetY(), drone.position.GetZ()))
-        * glm::mat4_cast(glm::quat(drone.rotation.GetW(), drone.rotation.GetX(), drone.rotation.GetY(), drone.rotation.GetZ()));
-    const glm::vec3 body_size(
-        drone.body_half_extent.GetX() * 2.0f,
-        drone.body_half_extent.GetY() * 2.0f,
-        drone.body_half_extent.GetZ() * 2.0f);
-    DrawMesh(cube_, program_, transform * glm::scale(glm::mat4(1.0f), body_size), glm::vec3(0.85f, 0.35f, 0.15f));
-    for (const JPH::RVec3 &motor_position : drone.motor_positions) {
-        const glm::mat4 marker = glm::translate(glm::mat4(1.0f), glm::vec3(motor_position.GetX(), motor_position.GetY(), motor_position.GetZ()))
-            * glm::scale(glm::mat4(1.0f), glm::vec3(0.05f));
-        DrawMesh(cube_, program_, marker, glm::vec3(0.1f, 0.8f, 0.9f));
+    const glm::mat4 transform = glm::translate(glm::mat4(1), glm::vec3(aircraft.position_ft))
+        * glm::mat4_cast(glm::quat(aircraft.rotation));
+    for (const AircraftVisualPart &part : definition.visual_parts) {
+        float angle = 0.0f;
+        switch (part.motion) {
+        case VisualPartMotion::Rotor: angle = static_cast<float>(aircraft.rotor_angles_rad[part.propulsion_index]); break;
+        case VisualPartMotion::LeftAileron: angle = static_cast<float>(aircraft.left_aileron_rad); break;
+        case VisualPartMotion::RightAileron: angle = static_cast<float>(aircraft.right_aileron_rad); break;
+        case VisualPartMotion::Elevator: angle = static_cast<float>(aircraft.elevator_rad); break;
+        case VisualPartMotion::Rudder: angle = -static_cast<float>(aircraft.rudder_rad); break;
+        case VisualPartMotion::Flap: angle = static_cast<float>(aircraft.flap_rad); break;
+        case VisualPartMotion::Fixed: break;
+        }
+        const glm::vec3 hinge(part.hinge_ft[0], part.hinge_ft[1], part.hinge_ft[2]);
+        const glm::vec3 center(part.center_ft[0], part.center_ft[1], part.center_ft[2]);
+        const glm::vec3 axis(part.axis[0], part.axis[1], part.axis[2]);
+        const glm::vec3 size(part.size_ft[0], part.size_ft[1], part.size_ft[2]);
+        const glm::vec3 color(part.color[0], part.color[1], part.color[2]);
+        const glm::mat4 model = transform * glm::translate(glm::mat4(1), hinge)
+            * glm::rotate(glm::mat4(1), angle, axis)
+            * glm::translate(glm::mat4(1), center - hinge)
+            * glm::rotate(glm::mat4(1), part.base_yaw_rad, glm::vec3(0,1,0))
+            * glm::scale(glm::mat4(1), size);
+        DrawMesh(cube_, program_, model, color);
     }
 }

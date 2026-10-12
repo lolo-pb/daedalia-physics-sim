@@ -1,150 +1,71 @@
 #include "ui.hpp"
-
-#include <array>
-
 #include <imgui.h>
-
-#include "sensors/ideal_barometer.hpp"
 #include "simulation.hpp"
 
-PhysicsPanelResult DrawPhysicsPanel(
-    Simulation &simulation,
-    bool &paused,
-    bool &single_step,
-    bool &follow_drone) {
+PhysicsPanelResult DrawPhysicsPanel(Simulation &simulation, bool &paused,
+                                    bool &single_step, bool &follow_drone) {
     PhysicsPanelResult result;
-
     ImGui::Begin("Physics");
-    ImGui::SeparatorText("Flight controller");
-    if (ImGui::RadioButton("1 Demo", simulation.GetActiveController() == FlightController::Demo)) {
-        simulation.SelectController(1);
-    }
-    ImGui::SameLine();
-    if (ImGui::RadioButton("2 AngleMode", simulation.GetActiveController() == FlightController::AngleMode)) {
-        simulation.SelectController(2);
-    }
-    ImGui::SameLine();
-    if (ImGui::RadioButton("3 HorizonMode", simulation.GetActiveController() == FlightController::HorizonMode)) {
-        simulation.SelectController(3);
-    }
-    if (ImGui::RadioButton("4 Position Hold", simulation.GetActiveController() == FlightController::PositionHold)) {
-        simulation.SelectController(4);
-    }
-    ImGui::SameLine();
-    if (ImGui::RadioButton("5 Tricopter Angle", simulation.GetActiveController() == FlightController::TricopterAngleMode)) {
-        simulation.SelectController(5);
-    }
-    if (ImGui::RadioButton("6 TBC", simulation.GetActiveController() == FlightController::TBC)) {
-        simulation.SelectController(6);
-    }
-    if (simulation.GetActiveController() == FlightController::Demo) {
-        ImGui::TextUnformatted("X arm/disarm motors");
-    }
-    if (simulation.GetActiveController() == FlightController::AngleMode
-        || simulation.GetActiveController() == FlightController::HorizonMode) {
-        ImGui::Text("Throttle: %.3f", simulation.GetActiveControllerThrottle());
-        ImGui::TextUnformatted("W/S pitch, A/D roll, Q/E yaw, R/F throttle");
-        if (simulation.GetActiveController() == FlightController::HorizonMode) {
-            ImGui::TextUnformatted("Hold pitch or roll to rotate without an angle limit");
+    const auto &definition = simulation.GetAircraftDefinition();
+    ImGui::TextUnformatted(definition.display_name.data());
+    ImGui::SeparatorText("Controller");
+    for (std::size_t i = 0; i < definition.available_controllers.size(); ++i) {
+        if (ImGui::RadioButton("1 Manual", simulation.GetActiveController() == definition.available_controllers[i])) {
+            simulation.SelectController(static_cast<int>(i + 1));
         }
-        ImGui::TextUnformatted("Hold right mouse for camera controls");
     }
-    if (simulation.GetActiveController() == FlightController::PositionHold) {
-        ImGui::TextUnformatted("W/S forward, A/D right, Q/E yaw, R/F altitude");
-        ImGui::TextUnformatted("Commands move the held target relative to its heading");
-        ImGui::TextUnformatted("Hold right mouse for camera controls");
-    }
-    if (simulation.GetActiveController() == FlightController::TricopterAngleMode) {
-        ImGui::Text("Throttle: %.3f", simulation.GetActiveControllerThrottle());
-        ImGui::TextUnformatted("W/S pitch, A/D roll, R/F throttle");
-        ImGui::TextUnformatted("Yaw is unsupported by the current tricopter");
-        ImGui::TextUnformatted("Hold right mouse for camera controls");
-    }
-    if (simulation.GetActiveController() == FlightController::TBC) {
-        ImGui::TextUnformatted("Testing upward-thrust allocation");
-    }
-
+    ImGui::Text("Throttle: %.3f", simulation.GetActiveControllerThrottle());
+    ImGui::TextUnformatted("W/S pitch, A/D roll, Q/E yaw, R/F throttle");
+    ImGui::TextUnformatted("G/H flaps, hold B for brakes");
+    ImGui::TextUnformatted("Hold right mouse for camera controls");
     ImGui::SeparatorText("Simulation");
-    if (ImGui::Button(paused ? "Resume" : "Pause")) {
-        paused = !paused;
-    }
+    if (ImGui::Button(paused ? "Resume" : "Pause")) paused = !paused;
     ImGui::SameLine();
-    if (ImGui::Button("Single step")) {
-        paused = true;
-        single_step = true;
-    }
+    if (ImGui::Button("Single step")) { paused = true; single_step = true; }
     ImGui::SameLine();
-    if (ImGui::Button("Reset")) {
-        simulation.Reset();
-        result.reset = true;
-    }
-
-    std::array<float, 3> gravity = simulation.GetGravity();
-    if (ImGui::DragFloat3("Gravity", gravity.data(), 0.1f)) {
-        simulation.SetGravity(gravity);
-    }
-
-    int physics_frequency_hz = simulation.GetPhysicsFrequencyHz();
-    if (ImGui::SliderInt("Physics frequency (Hz)", &physics_frequency_hz, 1, 120)) {
-        simulation.SetPhysicsFrequencyHz(physics_frequency_hz);
+    if (ImGui::Button("Reset")) { simulation.Reset(); result.reset = true; }
+    int hz = simulation.GetPhysicsFrequencyHz();
+    if (ImGui::SliderInt("Physics frequency (Hz)", &hz, 1, 240)) {
+        simulation.SetPhysicsFrequencyHz(hz);
         result.physics_frequency_changed = true;
     }
-
-    ImGui::SeparatorText("Camera");
-    if (ImGui::Checkbox("Follow drone", &follow_drone) && follow_drone) {
-        result.follow_drone_enabled = true;
-    }
-
-    const DroneInspection drone = simulation.InspectDrone();
-    ImGui::SeparatorText("Drone");
-    ImGui::Text("Position: %.3f, %.3f, %.3f", drone.position.GetX(), drone.position.GetY(), drone.position.GetZ());
-    ImGui::Text("Rotation: %.3f, %.3f, %.3f, %.3f", drone.rotation.GetX(), drone.rotation.GetY(), drone.rotation.GetZ(), drone.rotation.GetW());
-    ImGui::Text("Linear velocity: %.3f, %.3f, %.3f", drone.linear_velocity.GetX(), drone.linear_velocity.GetY(), drone.linear_velocity.GetZ());
-    ImGui::Text("Angular velocity: %.3f, %.3f, %.3f", drone.angular_velocity.GetX(), drone.angular_velocity.GetY(), drone.angular_velocity.GetZ());
-    ImGui::Text("Mass: %.3f", drone.mass);
+    if (ImGui::Checkbox("Follow aircraft", &follow_drone) && follow_drone) result.follow_drone_enabled = true;
+    const auto &state = simulation.InspectAircraft();
+    ImGui::SeparatorText("JSBSim state (native units)");
+    ImGui::Text("Time: %.3f s", state.timestamp_seconds);
+    ImGui::Text("Position NED (ft): %.3f, %.3f, %.3f", state.position_ned_ft.x, state.position_ned_ft.y, state.position_ned_ft.z);
+    ImGui::Text("Velocity NED (ft/s): %.3f, %.3f, %.3f", state.velocity_ned_ft_per_second.x, state.velocity_ned_ft_per_second.y, state.velocity_ned_ft_per_second.z);
+    ImGui::Text("Mass: %.3f slugs", state.mass_slugs);
+    ImGui::Text("Gravity: %.3f ft/s^2", state.gravity_ft_per_second_squared);
+    ImGui::Text("Altitude ASL: %.3f ft", state.altitude_asl_ft);
+    const auto &commands = simulation.GetLatestCommands();
+    ImGui::Text("Roll/pitch/yaw commands: %.2f, %.2f, %.2f", commands.roll, commands.pitch, commands.yaw);
+    ImGui::Text("Flaps: %.2f  Brakes: %.2f / %.2f", commands.flaps, commands.left_brake, commands.right_brake);
     ImGui::End();
-
     return result;
 }
 
 void DrawSensorsPanel(const Simulation &simulation) {
-    const ImuSample &imu = simulation.GetLatestImuSample();
-    const GpsSample &gps = simulation.GetLatestGpsSample();
-    const BarometerSample &barometer = simulation.GetLatestBarometerSample();
-    const MagnetometerSample &magnetometer = simulation.GetLatestMagnetometerSample();
-
+    const auto &imu = simulation.GetLatestImuSample();
+    const auto &gps = simulation.GetLatestGpsSample();
+    const auto &barometer = simulation.GetLatestBarometerSample();
+    const auto &magnetometer = simulation.GetLatestMagnetometerSample();
     ImGui::Begin("Sensors");
-    ImGui::SeparatorText("IMU");
-    ImGui::Text("Timestamp: %.3f s", imu.timestamp_seconds);
-    ImGui::Text(
-        "Gyro (body, rad/s): %.3f, %.3f, %.3f",
-        imu.body_gyro_rad_per_second.x,
-        imu.body_gyro_rad_per_second.y,
-        imu.body_gyro_rad_per_second.z);
-    ImGui::Text(
-        "Specific force (body, m/s^2): %.3f, %.3f, %.3f",
-        imu.body_specific_force_meters_per_second_squared.x,
-        imu.body_specific_force_meters_per_second_squared.y,
-        imu.body_specific_force_meters_per_second_squared.z);
-    ImGui::SeparatorText("GPS");
-    ImGui::Text(
-        "Position (world, m): %.3f, %.3f, %.3f",
-        gps.world_position_meters.x,
-        gps.world_position_meters.y,
-        gps.world_position_meters.z);
-    ImGui::Text(
-        "Velocity (world, m/s): %.3f, %.3f, %.3f",
-        gps.world_velocity_meters_per_second.x,
-        gps.world_velocity_meters_per_second.y,
-        gps.world_velocity_meters_per_second.z);
+    ImGui::Text("Sample time: %.3f s", imu.timestamp_seconds);
+    ImGui::SeparatorText("IMU (body: forward, right, down)");
+    const auto &gyro = imu.body_gyro_rad_per_second;
+    const auto &force = imu.body_specific_force_ft_per_second_squared;
+    ImGui::Text("Gyro (rad/s): %.3f, %.3f, %.3f", gyro.x, gyro.y, gyro.z);
+    ImGui::Text("Specific force (ft/s^2): %.3f, %.3f, %.3f", force.x, force.y, force.z);
+    ImGui::SeparatorText("GPS (north, east, down)");
+    const auto &position = gps.position_ned_ft;
+    const auto &velocity = gps.velocity_ned_ft_per_second;
+    ImGui::Text("Position (ft): %.3f, %.3f, %.3f", position.x, position.y, position.z);
+    ImGui::Text("Velocity (ft/s): %.3f, %.3f, %.3f", velocity.x, velocity.y, velocity.z);
     ImGui::SeparatorText("Barometer");
-    ImGui::Text("Pressure: %.2f Pa", barometer.pressure_pascals);
-    ImGui::Text("Altitude: %.3f m", BarometricAltitudeMeters(barometer.pressure_pascals));
+    ImGui::Text("Pressure: %.3f psf", barometer.pressure_psf);
     ImGui::SeparatorText("Magnetometer");
-    ImGui::Text(
-        "Magnetic field (body, uT): %.3f, %.3f, %.3f",
-        magnetometer.body_magnetic_field_microteslas.x,
-        magnetometer.body_magnetic_field_microteslas.y,
-        magnetometer.body_magnetic_field_microteslas.z);
+    const auto &field = magnetometer.body_magnetic_field_microteslas;
+    ImGui::Text("Field (body, uT): %.3f, %.3f, %.3f", field.x, field.y, field.z);
     ImGui::End();
 }

@@ -7,43 +7,52 @@
 
 #include "sensors/sensor_types.hpp"
 
-class MotorCommands {
+// Single command contract for all controllers. Motor mapping is reserved for
+// the later, approved legacy-controller integration.
+class ControllerOutput {
 public:
-    explicit MotorCommands(std::size_t motor_count) : targets_(motor_count) {}
-
+    explicit ControllerOutput(std::size_t motor_count = 0) : motors_(motor_count) {}
     void Clear() {
-        std::fill(targets_.begin(), targets_.end(), 0.0f);
+        std::fill(motors_.begin(), motors_.end(), 0.0f);
+        throttle = roll = pitch = yaw = flaps = left_brake = right_brake = 0.0f;
     }
-
     void SetMotor(std::size_t index, float target) {
-        if (index >= targets_.size()) {
-            return;
-        }
-        targets_[index] = std::isfinite(target)
-            ? std::clamp(target, 0.0f, 1.0f)
-            : 0.0f;
+        if (index < motors_.size()) motors_[index] = Bound(target, 0.0f, 1.0f);
     }
-
     float GetMotor(std::size_t index) const {
-        return index < targets_.size() ? targets_[index] : 0.0f;
+        return index < motors_.size() ? motors_[index] : 0.0f;
     }
-
+    void Normalize() {
+        throttle = Bound(throttle, 0, 1);
+        roll = Bound(roll, -1, 1);
+        pitch = Bound(pitch, -1, 1);
+        yaw = Bound(yaw, -1, 1);
+        flaps = Bound(flaps, 0, 1);
+        left_brake = Bound(left_brake, 0, 1);
+        right_brake = Bound(right_brake, 0, 1);
+    }
+    float throttle = 0.0f;
+    float roll = 0.0f;
+    float pitch = 0.0f;
+    float yaw = 0.0f;
+    float flaps = 0.0f;
+    float left_brake = 0.0f;
+    float right_brake = 0.0f;
 private:
-    std::vector<float> targets_;
+    static float Bound(float value, float low, float high) {
+        return std::isfinite(value) ? std::clamp(value, low, high) : 0.0f;
+    }
+    std::vector<float> motors_;
 };
+
+// Legacy sources remain unbuilt until their individual migration is approved.
+using MotorCommands = ControllerOutput;
 
 struct ControllerKeys {
-    bool w = false;
-    bool a = false;
-    bool s = false;
-    bool d = false;
-    bool q = false;
-    bool e = false;
-    bool r = false;
-    bool f = false;
-    bool x = false;
+    bool w = false, a = false, s = false, d = false;
+    bool q = false, e = false, r = false, f = false, x = false;
+    bool g = false, h = false, b = false;
 };
-
 struct ControllerInput {
     ImuSample imu;
     GpsSample gps;

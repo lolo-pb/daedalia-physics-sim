@@ -18,7 +18,8 @@ public:
     bool Initialize();
 
     void DrawScene(
-        const DroneRenderState &drone,
+        const AircraftDefinition &definition,
+        const AircraftRenderState &aircraft,
         const glm::vec3 &camera_position,
         const glm::vec3 &camera_forward,
         int width,

@@ -1,12 +1,12 @@
 #include "sensors/ideal_magnetometer.hpp"
+#include "physics/aircraft_state.hpp"
 
-MagnetometerSample IdealMagnetometerModel::Sample(
-    double timestamp_seconds,
-    const JPH::Quat &body_rotation) const {
-    const JPH::Vec3 world_magnetic_field_microteslas(0.0f, 0.0f, -50.0f);
-    const JPH::Vec3 body_field = body_rotation.Conjugated() * world_magnetic_field_microteslas;
-    return {
-        timestamp_seconds,
-        {body_field.GetX(), body_field.GetY(), body_field.GetZ()},
-    };
+namespace {
+SensorVector3 ToSensorVector(const glm::dvec3 &value) { return {value.x, value.y, value.z}; }
+}
+
+MagnetometerSample IdealMagnetometerModel::Sample(const AircraftState &state) const {
+    // Ideal 50 uT north-pointing field in NED, rotated into body axes.
+    const glm::dvec3 field = glm::conjugate(state.body_to_ned) * glm::dvec3(50, 0, 0);
+    return {state.timestamp_seconds, ToSensorVector(field)};
 }

@@ -16,7 +16,7 @@
 
 #include <glm/ext/matrix_transform.hpp>
 
-#include "drone_selection_menu.hpp"
+#include "aircraft_selection_menu.hpp"
 #include "renderer.hpp"
 #include "simulation.hpp"
 #include "startup_animation.hpp"
@@ -61,8 +61,8 @@ struct Camera {
     }
 };
 
-glm::vec3 ToGlm(const JPH::RVec3 &vector) {
-    return glm::vec3(vector.GetX(), vector.GetY(), vector.GetZ());
+glm::vec3 ToGlm(const glm::dvec3 &vector) {
+    return glm::vec3(vector);
 }
 
 class ApplicationResources {
@@ -161,20 +161,20 @@ private:
 
 } // namespace
 
-int RunInteractiveApplication(std::optional<DroneType> selected_drone) {
+int RunInteractiveApplication(std::optional<AircraftType> selected_aircraft) {
     ApplicationResources resources;
     if (!resources.Initialize()) {
         return EXIT_FAILURE;
     }
     SDL_Window *window = resources.Window();
     if (!PlayStartupAnimation(window)) return EXIT_SUCCESS;
-    if (!selected_drone) {
-        selected_drone = SelectDroneFromMenu(window);
-        if (!selected_drone) {
+    if (!selected_aircraft) {
+        selected_aircraft = SelectAircraftFromMenu(window);
+        if (!selected_aircraft) {
             return EXIT_SUCCESS;
         }
     }
-    Simulation simulation(CreateDroneDefinition(*selected_drone));
+    Simulation simulation(GetAircraftDefinition(*selected_aircraft));
     Renderer &renderer = resources.GetRenderer();
     bool running = true;
     bool looking = false;
@@ -182,7 +182,10 @@ int RunInteractiveApplication(std::optional<DroneType> selected_drone) {
     bool single_step = false;
     bool follow_drone = true;
     Camera camera;
-    glm::vec3 previous_drone_position = ToGlm(simulation.GetDronePosition());
+    const float camera_distance = simulation.GetAircraftDefinition().camera_distance_ft;
+    camera.position = ToGlm(simulation.GetAircraftPosition()) + glm::vec3(camera_distance, camera_distance * 0.6f, camera_distance);
+    camera.LookAt(ToGlm(simulation.GetAircraftPosition()));
+    glm::vec3 previous_drone_position = ToGlm(simulation.GetAircraftPosition());
     auto previous_time = std::chrono::steady_clock::now();
     double accumulator = 0.0;
     while (running) {
@@ -218,7 +221,7 @@ int RunInteractiveApplication(std::optional<DroneType> selected_drone) {
             if (looking && event.type == SDL_EVENT_MOUSE_MOTION) {
                 if (follow_drone) {
                     camera.OrbitAround(
-                        ToGlm(simulation.GetDronePosition()),
+                        ToGlm(simulation.GetAircraftPosition()),
                         event.motion.xrel * 0.1f,
                         -event.motion.yrel * 0.1f);
                 } else {
@@ -243,7 +246,7 @@ int RunInteractiveApplication(std::optional<DroneType> selected_drone) {
             accumulator = std::min(accumulator, simulation.GetPhysicsStepSeconds());
         }
         if (panel_result.follow_drone_enabled) {
-            previous_drone_position = ToGlm(simulation.GetDronePosition());
+            previous_drone_position = ToGlm(simulation.GetAircraftPosition());
             camera.LookAt(previous_drone_position);
         }
         DrawSensorsPanel(simulation);
@@ -253,8 +256,7 @@ int RunInteractiveApplication(std::optional<DroneType> selected_drone) {
         const glm::vec3 forward = camera.Forward();
         const glm::vec3 horizontal_forward = glm::normalize(glm::vec3(forward.x, 0.0f, forward.z));
         const glm::vec3 right = glm::normalize(glm::cross(horizontal_forward, glm::vec3(0.0f, 1.0f, 0.0f)));
-        const bool camera_accepts_keyboard = looking
-            || (simulation.GetActiveController() == FlightController::Demo && !ImGui::GetIO().WantCaptureKeyboard);
+        const bool camera_accepts_keyboard = looking && !ImGui::GetIO().WantCaptureKeyboard;
         if (camera_accepts_keyboard) {
             if (keys[SDL_SCANCODE_W]) camera.position += horizontal_forward * movement_speed;
             if (keys[SDL_SCANCODE_S]) camera.position -= horizontal_forward * movement_speed;
@@ -264,7 +266,7 @@ int RunInteractiveApplication(std::optional<DroneType> selected_drone) {
             if (keys[SDL_SCANCODE_LCTRL] || keys[SDL_SCANCODE_RCTRL]) camera.position.y -= movement_speed;
         }
         if (follow_drone) {
-            camera.LookAt(ToGlm(simulation.GetDronePosition()));
+            camera.LookAt(ToGlm(simulation.GetAircraftPosition()));
         }
 
         ControllerKeys controller_keys;
@@ -278,6 +280,9 @@ int RunInteractiveApplication(std::optional<DroneType> selected_drone) {
             controller_keys.r = keys[SDL_SCANCODE_R];
             controller_keys.f = keys[SDL_SCANCODE_F];
             controller_keys.x = keys[SDL_SCANCODE_X];
+            controller_keys.g = keys[SDL_SCANCODE_G];
+            controller_keys.h = keys[SDL_SCANCODE_H];
+            controller_keys.b = keys[SDL_SCANCODE_B];
         }
 
         if (single_step) {
@@ -292,7 +297,7 @@ int RunInteractiveApplication(std::optional<DroneType> selected_drone) {
             }
         }
 
-        const glm::vec3 current_drone_position = ToGlm(simulation.GetDronePosition());
+        const glm::vec3 current_drone_position = ToGlm(simulation.GetAircraftPosition());
         if (follow_drone) {
             camera.position += current_drone_position - previous_drone_position;
             camera.LookAt(current_drone_position);
@@ -302,7 +307,7 @@ int RunInteractiveApplication(std::optional<DroneType> selected_drone) {
         int width = 0;
         int height = 0;
         SDL_GetWindowSizeInPixels(window, &width, &height);
-        renderer.DrawScene(simulation.GetDroneRenderState(), camera.position, camera.Forward(), width, height);
+        renderer.DrawScene(simulation.GetAircraftDefinition(), simulation.GetAircraftRenderState(), camera.position, camera.Forward(), width, height);
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         SDL_GL_SwapWindow(window);
