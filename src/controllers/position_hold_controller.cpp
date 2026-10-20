@@ -12,6 +12,11 @@ Position Hold controller:
 - then sensor fusion adn robustness
 */
 namespace {
+constexpr double Pi = 3.14159265358979323846;
+constexpr double TwoPi = 2.0 * Pi;
+
+const vec3d world_up{0, 0, -1};
+const vec3d body_up{0, 0, -1};
 
 float KeyAxis(bool positive, bool negative) {
 	return static_cast<float>(positive) - static_cast<float>(negative);
@@ -29,6 +34,10 @@ void MixMotorTargets(ControllerOutput &output, float throttle,
 	output.SetMotor(3, throttle - pitch_correction - roll_correction - yaw_correction);
 }
 
+double DotProduct(const SensorVector3 &left, const SensorVector3 &right) {
+	return left.x * right.x + left.y * right.y + left.z * right.z;
+}
+
 } // namespace
 
 PositionHoldController::PositionHoldController() {}
@@ -41,15 +50,19 @@ void PositionHoldController::Update(const ControllerInput &input, ControllerOutp
 
 void PositionHoldController::UpdateAttitudeEstimate(const ControllerInput &input) {
 	const float timestep = input.timestep_seconds;
-	const SensorVector3 &gyro = input.imu.body_gyro_rad_per_second;
+	const vec3d &gyro = input.imu.body_gyro_rad_per_second;
 
-	const vec3f rotation_vector{
+	const vec3d rotation_vector{
 			gyro.x * timestep,
 			gyro.y * timestep,
 			gyro.z * timestep};
 
-	Quaternion body_to_ned_ = NormalizeQuaternion(MultiplyQuaternions(
+	body_to_ned_ = NormalizeQuaternion(MultiplyQuaternions(
 			body_to_ned_, QuaternionFromRotationVector(rotation_vector)));
 
 	const Quaternion correction = MultiplyQuaternions(target_body_to_ned, ConjugateQuaternion(body_to_ned_));
+	const SensorVector3 body_up_in_world = RotateVector(body_to_ned_, body_up);
+
+	double alignment = std::clamp(DotProduct(world_up, body_up_in_world), -1.0, 1.0);
+	double tilt_normalized = std::acos(alignment) / Pi;
 }
