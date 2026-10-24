@@ -21,6 +21,16 @@ constexpr double tilt_gain = 0.05f;
 const vec3d world_up{0, 0, -1}; // in ned
 const vec3d body_up{0, 0, -1}; // in body
 
+constexpr PidConfig TiltPidConfig{
+		0.10f,
+		0.0f,
+		0.02f,
+		-1.0f,
+		1.0f,
+		-0.15f,
+		0.15f,
+};
+
 float KeyAxis(bool positive, bool negative) {
 	return static_cast<float>(positive) - static_cast<float>(negative);
 }
@@ -81,6 +91,9 @@ void PositionHoldController::UpdateAttitudeEstimate(const ControllerInput &input
 	// “what body-frame rotation levels the drone?”
 	const Quaternion tilt_correction_q = QuaternionFromTwoUnitVectors(body_up, target_up_in_body);
 	const vec3d tilt_correction = QuaternionToRotationVector(tilt_correction_q);
+
+	const float pitch_correction = pitch_pid_.Update(tilt_correction.y, gyro.y, timestep);
+	const float roll_correction = roll_pid_.Update(tilt_correction.x, gyro.x, timestep);
 
 	MixMotorTargets(output, hover_throttle,
 									tilt_correction.y * tilt_gain,

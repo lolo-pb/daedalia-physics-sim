@@ -16,4 +16,7 @@ private:
 
 	Quaternion body_to_ned_;
 	Quaternion target_body_to_ned;
+
+	Pid pitch_pid_;
+	Pid roll_pid_;
 };

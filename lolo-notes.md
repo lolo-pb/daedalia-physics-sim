@@ -1,5 +1,8 @@
 # Daedalia Physics Sim
 
+to build quick do :
+cmake --build build
+
 ## Current state
 
 JSBSim 1.3.2 has replaced Jolt, including ground reactions. F450 quadcopter and C172 are selectable at startup or with `--aircraft f450|c172`.
