@@ -15,8 +15,8 @@ namespace {
 constexpr double Pi = 3.14159265358979323846;
 constexpr double TwoPi = 2.0 * Pi;
 
-const vec3d world_up{0, 0, -1};
-const vec3d body_up{0, 0, -1};
+const vec3d world_up{0, 0, -1}; // in ned
+const vec3d body_up{0, 0, -1}; // in body
 
 float KeyAxis(bool positive, bool negative) {
 	return static_cast<float>(positive) - static_cast<float>(negative);
@@ -48,7 +48,7 @@ void PositionHoldController::Update(const ControllerInput &input, ControllerOutp
 	UpdateAttitudeEstimate(input);
 }
 
-void PositionHoldController::UpdateAttitudeEstimate(const ControllerInput &input) {
+void PositionHoldController::UpdateAttitudeEstimate(const ControllerInput &input, ControllerOutput &output) {
 	const float timestep = input.timestep_seconds;
 	const vec3d &gyro = input.imu.body_gyro_rad_per_second;
 
@@ -63,6 +63,21 @@ void PositionHoldController::UpdateAttitudeEstimate(const ControllerInput &input
 	const Quaternion correction = MultiplyQuaternions(target_body_to_ned, ConjugateQuaternion(body_to_ned_));
 	const SensorVector3 body_up_in_world = RotateVector(body_to_ned_, body_up);
 
-	double alignment = std::clamp(DotProduct(world_up, body_up_in_world), -1.0, 1.0);
-	double tilt_normalized = std::acos(alignment) / Pi;
+	// If the drone is inverted
+	double vertical_alignment = std::clamp(DotProduct(world_up, body_up_in_world), -1.0, 1.0);
+	double tilt_normalized = std::acos(vertical_alignment) / Pi; // TODO : acos big nono
+
+	if (tilt_normalized < 0.5) {
+		// drone is inverted
+		// vertical_thrust = 0;
+	}
+
+	// where world-up currently appears in body axes
+	const vec3d target_up_in_body = RotateVector(ConjugateQuaternion(body_to_ned_), world_up);
+
+	// “what body-frame rotation levels the drone?”
+	const Quaternion tilt_correction_q = QuaternionFromTwoUnitVectors(body_up, target_up_in_body);
+	const vec3d tilt_correction = QuaternionToRotationVector(tilt_correction_q);
+
+	MixMotorTargets(output, 0, tilt_correction.y, tilt_correction.x, 0);
 }
