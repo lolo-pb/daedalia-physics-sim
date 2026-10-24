@@ -1,4 +1,5 @@
 #include "controllers/position_hold_controller.hpp"
+#include "sensors/ideal_barometer.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -12,7 +13,7 @@ Position Hold controller:
 - then sensor fusion adn robustness
 */
 namespace {
-constexpr float hover_throttle = 0.4905f;
+constexpr float base_throttle = 0.4f;
 constexpr double Pi = 3.14159265358979323846;
 constexpr double TwoPi = 2.0 * Pi;
 
@@ -20,6 +21,18 @@ constexpr double tilt_gain = 0.05f;
 
 const vec3d world_up{0, 0, -1}; // in ned
 const vec3d body_up{0, 0, -1}; // in body
+
+double altitude_target = 10;
+
+constexpr PidConfig AltitudePidConfig{
+		0.02f,
+		0.0f,
+		0.01f,
+		-1.0f,
+		1.0f,
+		-0.15f,
+		0.15f,
+};
 
 constexpr PidConfig TiltPidConfig{
 		0.10f,
@@ -53,7 +66,10 @@ double DotProduct(const SensorVector3 &left, const SensorVector3 &right) {
 
 } // namespace
 
-PositionHoldController::PositionHoldController() {}
+PositionHoldController::PositionHoldController()
+		: altitude_pid_(AltitudePidConfig),
+			pitch_pid_(TiltPidConfig),
+			roll_pid_(TiltPidConfig) {}
 
 void PositionHoldController::Reset() {}
 
@@ -65,6 +81,8 @@ void PositionHoldController::UpdateAttitudeEstimate(const ControllerInput &input
 	const float timestep = input.timestep_seconds;
 	if (timestep <= 0) return;
 	const vec3d &gyro = input.imu.body_gyro_rad_per_second;
+
+	const double altitude = BarometricAltitudeFt(input.barometer.pressure_psf);
 
 	const vec3d rotation_vector{
 			gyro.x * timestep,
@@ -79,10 +97,12 @@ void PositionHoldController::UpdateAttitudeEstimate(const ControllerInput &input
 
 	// If the drone is inverted
 	double vertical_alignment = std::clamp(DotProduct(world_up, body_up_in_world), -1.0, 1.0);
+	double altitude_correction;
 
-	if (vertical_alignment < 0.0) {
-		// drone is inverted
-		// vertical_thrust = 0;
+	if (vertical_alignment >= 0.0) {
+		altitude_correction = base_throttle + altitude_pid_.Update(altitude_target - altitude, gyro.y, timestep);
+	} else {
+		altitude_correction = 0;
 	}
 
 	// where world-up currently appears in body axes
@@ -95,8 +115,15 @@ void PositionHoldController::UpdateAttitudeEstimate(const ControllerInput &input
 	const float pitch_correction = pitch_pid_.Update(tilt_correction.y, gyro.y, timestep);
 	const float roll_correction = roll_pid_.Update(tilt_correction.x, gyro.x, timestep);
 
-	MixMotorTargets(output, hover_throttle,
-									tilt_correction.y * tilt_gain,
-									tilt_correction.x * tilt_gain,
+	MixMotorTargets(output, altitude_correction,
+									pitch_correction,
+									roll_correction,
 									0);
 }
+
+/*
+we are getting there, we need to change gyro.y from the pid corrections for altitude
+
+and need to work in the initializations and reset.
+
+*/
