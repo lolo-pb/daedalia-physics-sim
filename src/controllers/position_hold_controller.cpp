@@ -12,8 +12,11 @@ Position Hold controller:
 - then sensor fusion adn robustness
 */
 namespace {
+constexpr float hover_throttle = 0.4905f;
 constexpr double Pi = 3.14159265358979323846;
 constexpr double TwoPi = 2.0 * Pi;
+
+constexpr double tilt_gain = 0.05f;
 
 const vec3d world_up{0, 0, -1}; // in ned
 const vec3d body_up{0, 0, -1}; // in body
@@ -45,11 +48,12 @@ PositionHoldController::PositionHoldController() {}
 void PositionHoldController::Reset() {}
 
 void PositionHoldController::Update(const ControllerInput &input, ControllerOutput &output) {
-	UpdateAttitudeEstimate(input);
+	UpdateAttitudeEstimate(input, output);
 }
 
 void PositionHoldController::UpdateAttitudeEstimate(const ControllerInput &input, ControllerOutput &output) {
 	const float timestep = input.timestep_seconds;
+	if (timestep <= 0) return;
 	const vec3d &gyro = input.imu.body_gyro_rad_per_second;
 
 	const vec3d rotation_vector{
@@ -60,14 +64,13 @@ void PositionHoldController::UpdateAttitudeEstimate(const ControllerInput &input
 	body_to_ned_ = NormalizeQuaternion(MultiplyQuaternions(
 			body_to_ned_, QuaternionFromRotationVector(rotation_vector)));
 
-	const Quaternion correction = MultiplyQuaternions(target_body_to_ned, ConjugateQuaternion(body_to_ned_));
+	//const Quaternion correction = MultiplyQuaternions(target_body_to_ned, ConjugateQuaternion(body_to_ned_));
 	const SensorVector3 body_up_in_world = RotateVector(body_to_ned_, body_up);
 
 	// If the drone is inverted
 	double vertical_alignment = std::clamp(DotProduct(world_up, body_up_in_world), -1.0, 1.0);
-	double tilt_normalized = std::acos(vertical_alignment) / Pi; // TODO : acos big nono
 
-	if (tilt_normalized < 0.5) {
+	if (vertical_alignment < 0.0) {
 		// drone is inverted
 		// vertical_thrust = 0;
 	}
@@ -79,5 +82,8 @@ void PositionHoldController::UpdateAttitudeEstimate(const ControllerInput &input
 	const Quaternion tilt_correction_q = QuaternionFromTwoUnitVectors(body_up, target_up_in_body);
 	const vec3d tilt_correction = QuaternionToRotationVector(tilt_correction_q);
 
-	MixMotorTargets(output, 0, tilt_correction.y, tilt_correction.x, 0);
+	MixMotorTargets(output, hover_throttle,
+									tilt_correction.y * tilt_gain,
+									tilt_correction.x * tilt_gain,
+									0);
 }
