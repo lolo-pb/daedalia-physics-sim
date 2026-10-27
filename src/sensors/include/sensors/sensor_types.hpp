@@ -5,6 +5,11 @@ struct SensorVector3 {
 	double y = 0.0;
 	double z = 0.0;
 };
+
+constexpr SensorVector3 operator-(const SensorVector3 &vector) {
+	return {-vector.x, -vector.y, -vector.z};
+}
+
 using vec3d = SensorVector3;
 
 // Body axes: X forward, Y right, Z down. World samples use local NED.
