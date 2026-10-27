@@ -4,10 +4,10 @@ struct PidConfig {
     float proportional = 0.0f;
     float integral = 0.0f;
     float derivative = 0.0f;
-    float minimum_integral = 0.0f;
-    float maximum_integral = 0.0f;
-    float minimum_output = 0.0f;
-    float maximum_output = 0.0f;
+    float minimum_integral = -1.0f;
+    float maximum_integral = 1.0f;
+    float minimum_output = -1.0f;
+    float maximum_output = 1.0f;
 };
 
 class Pid {

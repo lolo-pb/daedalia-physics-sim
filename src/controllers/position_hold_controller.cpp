@@ -23,23 +23,15 @@ const vec3d world_up{0, 0, -1}; // in ned
 const vec3d body_up{0, 0, -1}; // in body
 
 constexpr PidConfig AltitudePidConfig{
-		0.02f,
+		0.005f,
 		0.0f,
 		0.01f,
-		-1.0f,
-		1.0f,
-		-0.15f,
-		0.15f,
 };
 
 constexpr PidConfig TiltPidConfig{
 		0.10f,
 		0.0f,
 		0.02f,
-		-1.0f,
-		1.0f,
-		-0.15f,
-		0.15f,
 };
 
 float KeyAxis(bool positive, bool negative) {
