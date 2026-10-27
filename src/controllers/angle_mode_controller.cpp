@@ -8,7 +8,8 @@ namespace {
 constexpr float base_throttle = 0.40675f;
 constexpr double Pi = 3.14159265358979323846;
 constexpr double TwoPi = 2.0 * Pi;
-constexpr double KeyboardTiltRadians = 10.0 * Pi / 180.0;
+constexpr double KeyboardTiltRadians = 1.0 * Pi / 180.0;
+constexpr double AltitudeTargetRateFtPerSecond = 1.0;
 
 constexpr double tilt_gain = 0.05f;
 
@@ -122,6 +123,9 @@ void AngleModeController::ApplyCorrections(const ControllerInput &input, Control
 }
 
 void AngleModeController::ApplyKeyboardTiltOffset(const ControllerInput &input) {
+	altitude_target += AltitudeTargetRateFtPerSecond *
+										 KeyAxis(input.keys.r, input.keys.f) * timestep;
+
 	const double pitch_tilt = KeyboardTiltRadians * KeyAxis(input.keys.s, input.keys.w);
 	const double roll_tilt = KeyboardTiltRadians * KeyAxis(input.keys.d, input.keys.a);
 
