@@ -81,6 +81,8 @@ void PositionHoldController::Update(const ControllerInput &input, ControllerOutp
 
 	UpdateAttitudeEstimate(input);
 	ApplyCorrections(input, output);
+
+	MixMotorTargets(output, altitude_correction, pitch_correction, roll_correction, 0);
 }
 
 void PositionHoldController::UpdateAttitudeEstimate(const ControllerInput &input) {
@@ -103,7 +105,6 @@ void PositionHoldController::ApplyCorrections(const ControllerInput &input, Cont
 
 	// If the drone is inverted
 	double vertical_alignment = DotProduct(world_up, body_up_in_world);
-	double altitude_correction;
 
 	if (vertical_alignment >= 0.0) {
 		flipped = false;
@@ -120,13 +121,8 @@ void PositionHoldController::ApplyCorrections(const ControllerInput &input, Cont
 	const Quaternion tilt_correction_q = QuaternionFromTwoUnitVectors(body_up, target_up_in_body);
 	const vec3d tilt_correction = QuaternionToRotationVector(tilt_correction_q);
 
-	const float pitch_correction = pitch_pid_.Update(tilt_correction.y, gyro.y, timestep);
-	const float roll_correction = roll_pid_.Update(tilt_correction.x, gyro.x, timestep);
-
-	MixMotorTargets(output, altitude_correction,
-									pitch_correction,
-									roll_correction,
-									0);
+	pitch_correction = pitch_pid_.Update(tilt_correction.y, gyro.y, timestep);
+	roll_correction = roll_pid_.Update(tilt_correction.x, gyro.x, timestep);
 }
 
 void PositionHoldController::SetWorldEstimate(const ControllerInput &input) {

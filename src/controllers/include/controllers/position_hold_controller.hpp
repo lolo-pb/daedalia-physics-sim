@@ -33,5 +33,9 @@ private:
 	float timestep;
 	double altitude_target = 10;
 
+	float altitude_correction;
+	float pitch_correction;
+	float roll_correction;
+
 	bool flipped = false;
 };
