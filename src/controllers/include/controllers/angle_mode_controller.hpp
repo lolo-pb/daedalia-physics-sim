@@ -38,6 +38,8 @@ private:
 	float altitude_correction;
 	float pitch_correction;
 	float roll_correction;
+	float yaw_correction;
+	double vertical_alignment = 1.0;
 
 	bool flipped = false;
 };

@@ -74,7 +74,8 @@ void AngleModeController::Update(const ControllerInput &input, ControllerOutput 
 	ApplyCorrections(input, output);
 	ApplyKeyboardTiltOffset(input);
 
-	MixMotorTargets(output, altitude_correction, pitch_correction, roll_correction, 0);
+	MixMotorTargets(output, altitude_correction, pitch_correction, roll_correction,
+									yaw_correction);
 }
 
 float AngleModeController::GetThrottle() const { return base_throttle; }
@@ -98,7 +99,7 @@ void AngleModeController::ApplyCorrections(const ControllerInput &input, Control
 	const SensorVector3 body_up_in_world = RotateVector(body_to_ned_, body_up);
 
 	// If the drone is inverted
-	double vertical_alignment = DotProduct(world_up, body_up_in_world);
+	vertical_alignment = DotProduct(world_up, body_up_in_world);
 
 	if (vertical_alignment >= 0.0) {
 		flipped = false;
@@ -117,11 +118,20 @@ void AngleModeController::ApplyCorrections(const ControllerInput &input, Control
 
 	pitch_correction = pitch_pid_.Update(tilt_correction.y, gyro.y, timestep);
 	roll_correction = roll_pid_.Update(tilt_correction.x, gyro.x, timestep);
+	yaw_correction = 0;
 }
 
 void AngleModeController::ApplyKeyboardTiltOffset(const ControllerInput &input) {
-	pitch_correction += KeyboardTiltRadians * KeyAxis(input.keys.s, input.keys.w);
-	roll_correction += KeyboardTiltRadians * KeyAxis(input.keys.d, input.keys.a);
+	const double pitch_tilt = KeyboardTiltRadians * KeyAxis(input.keys.s, input.keys.w);
+	const double roll_tilt = KeyboardTiltRadians * KeyAxis(input.keys.d, input.keys.a);
+
+	pitch_correction += pitch_tilt;
+	roll_correction += roll_tilt;
+	yaw_correction += KeyboardTiltRadians * KeyAxis(input.keys.e, input.keys.q);
+
+	if (vertical_alignment > 0.0) {
+		altitude_correction /= vertical_alignment;
+	}
 }
 
 void AngleModeController::SetWorldEstimate(const ControllerInput &input) {
