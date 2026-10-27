@@ -13,7 +13,7 @@ Position Hold controller:
 - then sensor fusion adn robustness
 */
 namespace {
-constexpr float base_throttle = 0.4f;
+constexpr float base_throttle = 0.40675f; // perfect hover btween (0.40673 ; 0.40675)
 constexpr double Pi = 3.14159265358979323846;
 constexpr double TwoPi = 2.0 * Pi;
 
@@ -24,8 +24,8 @@ const vec3d body_up{0, 0, -1}; // in body
 
 constexpr PidConfig AltitudePidConfig{
 		// TODO needs further tuning
-		0.0025f,
-		0.001f,
+		0.0002f, //0.0001f
+		0.000002f,
 		0.00f,
 };
 
