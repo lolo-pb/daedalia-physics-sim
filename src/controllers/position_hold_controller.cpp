@@ -105,10 +105,11 @@ void PositionHoldController::ApplyCorrections(const ControllerInput &input, Cont
 
 	// If the drone is inverted
 	double vertical_alignment = DotProduct(world_up, body_up_in_world);
+	const double vertical_speed = -input.gps.velocity_ned_ft_per_second.z;
 
 	if (vertical_alignment >= 0.0) {
 		flipped = false;
-		altitude_correction = base_throttle + altitude_pid_.Update(altitude_target - altitude, gyro.y, timestep);
+		altitude_correction = base_throttle + altitude_pid_.Update(altitude_target - altitude, vertical_speed, timestep);
 	} else {
 		flipped = true;
 		altitude_correction = 0;
