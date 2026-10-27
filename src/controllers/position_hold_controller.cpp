@@ -22,8 +22,6 @@ constexpr double tilt_gain = 0.05f;
 const vec3d world_up{0, 0, -1}; // in ned
 const vec3d body_up{0, 0, -1}; // in body
 
-double altitude_target = 10;
-
 constexpr PidConfig AltitudePidConfig{
 		0.02f,
 		0.0f,
@@ -74,15 +72,15 @@ PositionHoldController::PositionHoldController()
 void PositionHoldController::Reset() {}
 
 void PositionHoldController::Update(const ControllerInput &input, ControllerOutput &output) {
-	UpdateAttitudeEstimate(input, output);
+	timestep = input.timestep_seconds;
+	if (timestep <= 0) return;
+
+	UpdateAttitudeEstimate(input);
+	ApplyCorrections(input, output);
 }
 
-void PositionHoldController::UpdateAttitudeEstimate(const ControllerInput &input, ControllerOutput &output) {
-	const float timestep = input.timestep_seconds;
-	if (timestep <= 0) return;
+void PositionHoldController::UpdateAttitudeEstimate(const ControllerInput &input) {
 	const vec3d &gyro = input.imu.body_gyro_rad_per_second;
-
-	const double altitude = BarometricAltitudeFt(input.barometer.pressure_psf);
 
 	const vec3d rotation_vector{
 			gyro.x * timestep,
@@ -91,12 +89,16 @@ void PositionHoldController::UpdateAttitudeEstimate(const ControllerInput &input
 
 	body_to_ned_ = NormalizeQuaternion(MultiplyQuaternions(
 			body_to_ned_, QuaternionFromRotationVector(rotation_vector)));
+}
 
-	//const Quaternion correction = MultiplyQuaternions(target_body_to_ned, ConjugateQuaternion(body_to_ned_));
+void PositionHoldController::ApplyCorrections(const ControllerInput &input, ControllerOutput &output) {
+	const vec3d &gyro = input.imu.body_gyro_rad_per_second;
+	const double altitude = BarometricAltitudeFt(input.barometer.pressure_psf);
+
 	const SensorVector3 body_up_in_world = RotateVector(body_to_ned_, body_up);
 
 	// If the drone is inverted
-	double vertical_alignment = std::clamp(DotProduct(world_up, body_up_in_world), -1.0, 1.0);
+	double vertical_alignment = DotProduct(world_up, body_up_in_world);
 	double altitude_correction;
 
 	if (vertical_alignment >= 0.0) {
@@ -126,4 +128,5 @@ we are getting there, we need to change gyro.y from the pid corrections for alti
 
 and need to work in the initializations and reset.
 
+update pid to just recieve error and timestep
 */
