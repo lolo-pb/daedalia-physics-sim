@@ -98,6 +98,7 @@ void HorizonModeController::ApplyCorrections(const ControllerInput &input,
 																						 ControllerOutput &output, bool keypressed) {
 	const vec3d &gyro = input.imu.body_gyro_rad_per_second;
 	const double altitude = BarometricAltitudeFt(input.barometer.pressure_psf);
+	const double vertical_speed = -input.gps.velocity_ned_ft_per_second.z;
 
 	const SensorVector3 body_up_in_world = RotateVector(body_to_ned_, body_up);
 
@@ -105,7 +106,8 @@ void HorizonModeController::ApplyCorrections(const ControllerInput &input,
 
 	if (vertical_alignment >= 0.0) {
 		flipped = false;
-		altitude_correction = base_throttle + altitude_pid_.Update(altitude_target - altitude, gyro.y, timestep);
+		altitude_correction = base_throttle + altitude_pid_.Update(
+				altitude_target - altitude, vertical_speed, timestep);
 	} else {
 		flipped = true;
 		altitude_correction = 0;
