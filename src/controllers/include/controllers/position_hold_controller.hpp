@@ -14,6 +14,14 @@ public:
 private:
 	void UpdateAttitudeEstimate(const ControllerInput &input);
 	void ApplyCorrections(const ControllerInput &input, ControllerOutput &output);
+	void SetWorldEstimate(const ControllerInput &input);
+
+	enum ControllerState {
+		WakeUp,
+		Initializing,
+		Armed,
+	};
+	ControllerState state = WakeUp;
 
 	Quaternion body_to_ned_;
 	Quaternion target_body_to_ned;

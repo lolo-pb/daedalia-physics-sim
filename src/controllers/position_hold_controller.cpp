@@ -62,11 +62,22 @@ PositionHoldController::PositionHoldController()
 			pitch_pid_(TiltPidConfig),
 			roll_pid_(TiltPidConfig) {}
 
-void PositionHoldController::Reset() {}
+void PositionHoldController::Reset() {
+	state = WakeUp;
+}
 
 void PositionHoldController::Update(const ControllerInput &input, ControllerOutput &output) {
 	timestep = input.timestep_seconds;
 	if (timestep <= 0) return;
+
+	if (state == WakeUp) {
+		MixMotorTargets(output, 0, 0, 0, 0);
+		state = Initializing;
+		return;
+	} else if (state == Initializing) {
+		SetWorldEstimate(input);
+		state = Armed;
+	}
 
 	UpdateAttitudeEstimate(input);
 	ApplyCorrections(input, output);
@@ -116,6 +127,11 @@ void PositionHoldController::ApplyCorrections(const ControllerInput &input, Cont
 									pitch_correction,
 									roll_correction,
 									0);
+}
+
+void PositionHoldController::SetWorldEstimate(const ControllerInput &input) {
+	const vec3d body_down = -NormalizeVector(input.imu.body_specific_force_ft_per_second_squared);
+	body_to_ned_ = QuaternionFromTwoUnitVectors(body_down, -world_up);
 }
 
 /*
