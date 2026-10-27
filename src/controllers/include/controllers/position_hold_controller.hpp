@@ -24,4 +24,6 @@ private:
 
 	float timestep;
 	double altitude_target = 10;
+
+	bool flipped = false;
 };

@@ -23,9 +23,10 @@ const vec3d world_up{0, 0, -1}; // in ned
 const vec3d body_up{0, 0, -1}; // in body
 
 constexpr PidConfig AltitudePidConfig{
-		0.005f,
-		0.0f,
-		0.01f,
+		// TODO needs further tuning
+		0.0025f,
+		0.001f,
+		0.00f,
 };
 
 constexpr PidConfig TiltPidConfig{
@@ -94,8 +95,10 @@ void PositionHoldController::ApplyCorrections(const ControllerInput &input, Cont
 	double altitude_correction;
 
 	if (vertical_alignment >= 0.0) {
+		flipped = false;
 		altitude_correction = base_throttle + altitude_pid_.Update(altitude_target - altitude, gyro.y, timestep);
 	} else {
+		flipped = true;
 		altitude_correction = 0;
 	}
 
