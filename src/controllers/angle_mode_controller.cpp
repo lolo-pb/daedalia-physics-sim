@@ -1,112 +1,130 @@
 #include "controllers/angle_mode_controller.hpp"
+#include "sensors/ideal_barometer.hpp"
 
 #include <algorithm>
 #include <cmath>
-#include <cstddef>
 
 namespace {
+constexpr float base_throttle = 0.40675f;
+constexpr double Pi = 3.14159265358979323846;
+constexpr double TwoPi = 2.0 * Pi;
+constexpr double KeyboardTiltRadians = 10.0 * Pi / 180.0;
 
-constexpr float Pi = 3.14159265358979323846f;
-constexpr float TwoPi = 2.0f * Pi;
-constexpr float TiltRadians = 10.0f * Pi / 180.0f;
-constexpr float YawRateRadiansPerSecond = 45.0f * Pi / 180.0f;
-constexpr float ThrottleRatePerSecond = 0.25f;
-constexpr float HoverThrottle = 0.4905f;
-constexpr float MinimumAccelerationSquared = 1.0e-6f;
+constexpr double tilt_gain = 0.05f;
 
-constexpr PidConfig PitchPidConfig{
-    1.0f, 0.0f, 0.1f, -1.0f, 1.0f, -0.25f, 0.25f,
+const vec3d world_up{0, 0, -1};
+const vec3d body_up{0, 0, -1};
+
+constexpr PidConfig AltitudePidConfig{
+		0.0002f,
+		0.000002f,
+		0.00f,
 };
-constexpr PidConfig RollPidConfig = PitchPidConfig;
-constexpr PidConfig YawPidConfig = PitchPidConfig;
+
+constexpr PidConfig TiltPidConfig{
+		0.10f,
+		0.0f,
+		0.02f,
+};
 
 float KeyAxis(bool positive, bool negative) {
-  return static_cast<float>(positive) - static_cast<float>(negative);
+	return static_cast<float>(positive) - static_cast<float>(negative);
 }
 
 float WrapAngle(float angle) { return std::remainder(angle, TwoPi); }
 
 void MixMotorTargets(ControllerOutput &output, float throttle,
-                     float pitch_correction, float roll_correction,
-                     float yaw_correction) {
-  // F450 order: front-right, aft-left, front-left, aft-right.
-  output.SetMotor(0, throttle + pitch_correction - roll_correction + yaw_correction);
-  output.SetMotor(1, throttle - pitch_correction + roll_correction + yaw_correction);
-  output.SetMotor(2, throttle + pitch_correction + roll_correction - yaw_correction);
-  output.SetMotor(3, throttle - pitch_correction - roll_correction - yaw_correction);
+										 float pitch_correction, float roll_correction,
+										 float yaw_correction) {
+	output.SetMotor(0, throttle + pitch_correction - roll_correction + yaw_correction);
+	output.SetMotor(1, throttle - pitch_correction + roll_correction + yaw_correction);
+	output.SetMotor(2, throttle + pitch_correction + roll_correction - yaw_correction);
+	output.SetMotor(3, throttle - pitch_correction - roll_correction - yaw_correction);
+}
+
+double DotProduct(const SensorVector3 &left, const SensorVector3 &right) {
+	return left.x * right.x + left.y * right.y + left.z * right.z;
 }
 
 } // namespace
 
 AngleModeController::AngleModeController()
-    : pitch_pid_(PitchPidConfig), roll_pid_(RollPidConfig),
-      yaw_pid_(YawPidConfig) {}
+		: altitude_pid_(AltitudePidConfig),
+			pitch_pid_(TiltPidConfig),
+			roll_pid_(TiltPidConfig) {}
 
 void AngleModeController::Reset() {
-  pitch_pid_.Reset();
-  roll_pid_.Reset();
-  yaw_pid_.Reset();
-  pitch_rad_ = 0.0f;
-  roll_rad_ = 0.0f;
-  yaw_rad_ = 0.0f;
-  target_yaw_rad_ = 0.0f;
-  throttle_ = HoverThrottle;
-  attitude_initialized_ = false;
+	state = WakeUp;
 }
 
-void AngleModeController::Update(const ControllerInput &input,
-                                 ControllerOutput &output) {
-  const float timestep = input.timestep_seconds;
-  if (timestep <= 0.0f) {
-    return;
-  }
+void AngleModeController::Update(const ControllerInput &input, ControllerOutput &output) {
+	timestep = input.timestep_seconds;
+	if (timestep <= 0) return;
 
-  const ControllerKeys &keys = input.keys;
-  const float target_pitch_rad = TiltRadians * KeyAxis(keys.s, keys.w);
-  const float target_roll_rad = TiltRadians * KeyAxis(keys.a, keys.d);
-  target_yaw_rad_ = WrapAngle(target_yaw_rad_ + YawRateRadiansPerSecond *
-                              KeyAxis(keys.q, keys.e) * timestep);
-  throttle_ = std::clamp(throttle_ + ThrottleRatePerSecond *
-                         KeyAxis(keys.r, keys.f) * timestep, 0.0f, 1.0f);
+	if (state == WakeUp) {
+		MixMotorTargets(output, 0, 0, 0, 0);
+		state = Initializing;
+		return;
+	} else if (state == Initializing) {
+		SetWorldEstimate(input);
+		state = Armed;
+	}
 
-  UpdateAttitudeEstimate(input.imu, timestep);
-  const SensorVector3 &gyro = input.imu.body_gyro_rad_per_second;
-  const float pitch_correction =
-      pitch_pid_.Update(WrapAngle(target_pitch_rad - pitch_rad_), gyro.y, timestep);
-  const float roll_correction =
-      roll_pid_.Update(WrapAngle(target_roll_rad - roll_rad_), gyro.x, timestep);
-  const float yaw_correction =
-      yaw_pid_.Update(WrapAngle(target_yaw_rad_ - yaw_rad_), gyro.z, timestep);
+	UpdateAttitudeEstimate(input);
+	ApplyCorrections(input, output);
+	ApplyKeyboardTiltOffset(input);
 
-  MixMotorTargets(output, throttle_, pitch_correction, roll_correction,
-                  yaw_correction);
+	MixMotorTargets(output, altitude_correction, pitch_correction, roll_correction, 0);
 }
 
-float AngleModeController::GetThrottle() const { return throttle_; }
+float AngleModeController::GetThrottle() const { return base_throttle; }
 
-void AngleModeController::UpdateAttitudeEstimate(const ImuSample &imu,
-                                                 float timestep) {
-  const SensorVector3 &gyro = imu.body_gyro_rad_per_second;
-  const SensorVector3 &acceleration = imu.body_specific_force_ft_per_second_squared;
-  const float acceleration_squared = acceleration.x * acceleration.x +
-                                     acceleration.y * acceleration.y +
-                                     acceleration.z * acceleration.z;
-  const bool has_accelerometer_attitude = acceleration_squared >
-                                          MinimumAccelerationSquared;
-  const float accelerometer_pitch = std::atan2(
-      -acceleration.x, std::sqrt(acceleration.y * acceleration.y + acceleration.z * acceleration.z));
-  const float accelerometer_roll = std::atan2(acceleration.y, -acceleration.z);
+void AngleModeController::UpdateAttitudeEstimate(const ControllerInput &input) {
+	const vec3d &gyro = input.imu.body_gyro_rad_per_second;
 
-  if (!attitude_initialized_) {
-    if (has_accelerometer_attitude) {
-      pitch_rad_ = accelerometer_pitch;
-      roll_rad_ = accelerometer_roll;
-    }
-    attitude_initialized_ = true;
-    return;
-  }
+	const vec3d rotation_vector{
+			gyro.x * timestep,
+			gyro.y * timestep,
+			gyro.z * timestep};
 
-  pitch_rad_ = WrapAngle(pitch_rad_ + gyro.y * timestep);
-  roll_rad_ = WrapAngle(roll_rad_ + gyro.x * timestep);
-  yaw_rad_ = WrapAngle(yaw_rad_ + gyro.z * timestep);
+	body_to_ned_ = NormalizeQuaternion(MultiplyQuaternions(
+			body_to_ned_, QuaternionFromRotationVector(rotation_vector)));
+}
+
+void AngleModeController::ApplyCorrections(const ControllerInput &input, ControllerOutput &output) {
+	const vec3d &gyro = input.imu.body_gyro_rad_per_second;
+	const double altitude = BarometricAltitudeFt(input.barometer.pressure_psf);
+
+	const SensorVector3 body_up_in_world = RotateVector(body_to_ned_, body_up);
+
+	// If the drone is inverted
+	double vertical_alignment = DotProduct(world_up, body_up_in_world);
+
+	if (vertical_alignment >= 0.0) {
+		flipped = false;
+		altitude_correction = base_throttle + altitude_pid_.Update(altitude_target - altitude, gyro.y, timestep);
+	} else {
+		flipped = true;
+		altitude_correction = 0;
+	}
+
+	// where world-up currently appears in body axes
+	const vec3d target_up_in_body = RotateVector(ConjugateQuaternion(body_to_ned_), world_up);
+
+	// “what body-frame rotation levels the drone?”
+	const Quaternion tilt_correction_q = QuaternionFromTwoUnitVectors(body_up, target_up_in_body);
+	const vec3d tilt_correction = QuaternionToRotationVector(tilt_correction_q);
+
+	pitch_correction = pitch_pid_.Update(tilt_correction.y, gyro.y, timestep);
+	roll_correction = roll_pid_.Update(tilt_correction.x, gyro.x, timestep);
+}
+
+void AngleModeController::ApplyKeyboardTiltOffset(const ControllerInput &input) {
+	pitch_correction += KeyboardTiltRadians * KeyAxis(input.keys.s, input.keys.w);
+	roll_correction += KeyboardTiltRadians * KeyAxis(input.keys.d, input.keys.a);
+}
+
+void AngleModeController::SetWorldEstimate(const ControllerInput &input) {
+	const vec3d body_down = -NormalizeVector(input.imu.body_specific_force_ft_per_second_squared);
+	body_to_ned_ = QuaternionFromTwoUnitVectors(body_down, -world_up);
 }
