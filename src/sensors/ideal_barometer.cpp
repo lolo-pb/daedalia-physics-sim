@@ -1,25 +1,20 @@
 #include "sensors/ideal_barometer.hpp"
+#include "physics/aircraft_state.hpp"
 
 #include <cmath>
 
 namespace {
 
-constexpr float SeaLevelPressurePascals = 101325.0f;
-constexpr float AtmosphericScaleHeightMeters = 8434.5f;
+constexpr double SeaLevelPressurePsf = 2116.22;
+constexpr double AtmosphericScaleHeightFt = 28434.0;
 
 } // namespace
 
-BarometerSample IdealBarometerModel::Sample(
-    double timestamp_seconds,
-    float world_altitude_meters) const {
-    return {
-        timestamp_seconds,
-        SeaLevelPressurePascals
-            * std::exp(-world_altitude_meters / AtmosphericScaleHeightMeters),
-    };
+double BarometricAltitudeFt(double pressure_psf) {
+    return -AtmosphericScaleHeightFt *
+           std::log(pressure_psf / SeaLevelPressurePsf);
 }
 
-float BarometricAltitudeMeters(float pressure_pascals) {
-    return -AtmosphericScaleHeightMeters
-        * std::log(pressure_pascals / SeaLevelPressurePascals);
+BarometerSample IdealBarometerModel::Sample(const AircraftState &state) const {
+    return {state.timestamp_seconds, state.pressure_psf};
 }

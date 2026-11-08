@@ -1,12 +1,9 @@
 #pragma once
 
-#include <Jolt/Jolt.h>
-
 #include "sensors/sensor_types.hpp"
+struct AircraftState;
 
 class IdealMagnetometerModel {
 public:
-    MagnetometerSample Sample(
-        double timestamp_seconds,
-        const JPH::Quat &body_rotation) const;
+    MagnetometerSample Sample(const AircraftState &state) const;
 };

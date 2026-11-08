@@ -1,135 +1,81 @@
 # Daedalia Physics Sim
 
-Daedalia is a native C++ flight-physics test bed. SDL owns the window and OpenGL context, Jolt advances rigid-body physics, ImGui provides debug controls, and the renderer draws the latest simulated state.
+to build quick do :
+cmake --build build
 
-## Currently
+## Current state
 
-  as of rn im buiding the triangular bypyramid drone
-  its here the geometry is ugly af but its cool, the torque directions need to be checked and it needs a controller
+JSBSim 1.3.2 has replaced Jolt, including ground reactions. F450 quadcopter and C172 are selectable at startup or with `--aircraft f450|c172`.
 
-#
+- F450 is a four-rotor quadcopter. Its demo controller writes one normalized command to each motor directly. There is no simulator mixer or stabilizer.
+- C172 is a small fixed-wing propeller plane. Its temporary direct controller writes throttle plus aileron, elevator, rudder, flap, and brake commands; it does not stabilize the aircraft.
 
-Build and run:
+OpenGL draws representative aircraft parts, with pose, propellers and hinged surfaces driven by JSBSim. ImGui shows physics and programmable sensor readings. Backend smoke checks and offscreen rendering checks passed; this is not full model/controller validation.
+
+## Structure and flow
+
+- `src/aircraft/`: one AircraftDefinition owns each aircraft's model, initial conditions, integration settings, graphics references, control bindings and available controllers. Drones and planes use the same system.
+- `src/physics/`: JSBSim backend and native aircraft state.
+- `src/sensors/`: programmable ideal IMU, local GPS, barometer and magnetometer.
+- `src/controllers/`: one ControllerInput / ControllerOutput contract plus the active F450 demo and C172 direct controllers. Original controller algorithms remain untouched and excluded from the build.
+- `src/app/`: startup selection, fixed-step loop, SDL window, camera, ImGui and OpenGL. `src/main.cpp` launches interactive or headless mode.
+
+The old `src/drones/` files were removed; any remaining folders are empty leftovers. Custom drone declarations are recoverable through Git history, not ported JSBSim aircraft.
+
+Main file flow (arrows show calls or data passed between files):
+
+```mermaid
+flowchart TD
+    main["src/main.cpp"] --> app["src/app/application.cpp"]
+    main -->|"Headless checks"| sim["src/app/simulation.cpp"]
+    app --> menu["src/app/aircraft_selection_menu.cpp"]
+    menu -->|"Aircraft choice"| definition["src/aircraft/aircraft_definition.cpp"]
+    definition -->|"Model and settings"| sim
+    app -->|"Keys and fixed-step tick"| sim
+    sim --> backend["src/physics/jsbsim_backend.cpp"]
+    backend -->|"Native state"| state["src/physics/aircraft_state.hpp"]
+    state --> sensors["src/sensors/ideal_*.cpp"]
+    sensors -->|"Samples: ControllerInput"| io["src/controllers/include/controllers/controller_io.hpp"]
+    io --> controller["src/controllers/{demo,c172_direct}_controller.cpp"]
+    controller -->|"ControllerOutput via Simulation"| backend
+    sim -->|"Render state"| renderer["src/app/renderer.cpp"]
+    definition -->|"Visual parts"| renderer
+    sim -->|"Debug state and sensor samples"| ui["src/app/ui.cpp"]
+    ui -->|"Pause, reset and frequency"| app
+```
+
+## Boundaries
+
+Physics and sensors keep native units: feet, ft/s, ft/s², psf, slugs and radians. Controllers own any conversions. Body axes are forward/right/down; GPS uses local NED. Ground truth is not part of ControllerInput.
+
+Rendering also uses feet, mapping axes to X right, Y up, -Z forward. Ground reactions are JSBSim only; visual meshes do not provide arbitrary collisions.
+
+The configurable controller/sensor tick defaults to 60 Hz. Each aircraft owns a smaller maximum internal physics interval where needed; commands are held across substeps. Reset restores starting physics, sensors and controller state.
+
+Each aircraft declares the controllers it can run. The F450 demo writes its four indexed motor commands through the unified output; the C172 direct controller writes named fixed-wing actuator commands. JSBSim's stock F450 SCAS and C172 autopilots are disabled.
+
+## Build and run
 
 ```sh
 cmake -S . -B build
-cmake --build build
+cmake --build build -j4
 ./build/daedalia
-```
-
-Run the headless smoke test:
-
-```sh
 ctest --test-dir build --output-on-failure
 ```
 
-## Structure
+CMake downloads dependencies and copies JSBSim model data to `build/jsbsim-data`; its configured path works independently of the launch directory. See README for keyboard controls and direct aircraft/headless launch flags.
 
-- `src/app/` owns startup, the interactive loop, fixed-step simulation, UI, camera, and rendering.
-- `src/sensors/` converts Jolt state into ideal IMU, GPS, barometer, and magnetometer samples.
-- `src/controllers/` receives sensor samples and input keys, then writes normalized indexed motor commands.
-- `src/drones/` defines aircraft layouts and runs their bodies and motors in Jolt.
-- `src/main.cpp` selects interactive or headless mode and owns the Jolt runtime lifetime.
+## Limitations and deferred ideas
 
-Ground-truth position, attitude, and velocity stay inside the simulation and debug UI. Controllers only receive sensor samples.
+Stock F450 data emits configuration-version and internal sensor-binding warnings. Stepping and lift-off worked; model validation/tuning remains separate work.
 
-## Drone model
+Deferred: sensor noise/sample rates, telemetry CSV, movement trails, richer aircraft assets and map geometry. Preserve the custom-aircraft ideas: check triangular-bipyramid torque directions, add its altitude/GPS position hold, and explore a 4-by-4-rotor zero-gravity aircraft.
 
-`DroneDefinition` is a blueprint. It contains the body box size, mass, starting pose, and a variable-length list of motors. Each motor definition provides its local position, thrust direction, reaction-torque direction, maximum speed, and force coefficients.
+## Later work
 
-`CreateQuadcopterDefinition()` and `CreateTricopterDefinition()` supply the current aircraft layouts. The generic runtime `Drone` consumes the selected definition, creates the Jolt body, stores changing motor state, and applies motor forces and torques. Rendering also uses the definition's body size and the runtime motor-position list, so it does not assume a fixed motor count.
-
-Current quad motor indices are:
-
-```text
-0 front-left
-1 front-right
-2 rear-right
-3 rear-left
-```
-
-Local `+X` is right, `+Y` is up, and `-Z` is front.
-
-Current tricopter motor indices are:
-
-```text
-0 front-left
-1 front-right
-2 rear
-```
-
-## Controller command boundary
-
-`MotorCommands` is the physics-independent output API. Controllers call `SetMotor(index, target)` without receiving the selected drone type or motor count.
-
-- The command buffer is sized from the physical drone and cleared before every controller update.
-- Missing commands therefore remain at zero for that step.
-- Extra indices are ignored.
-- Finite targets are clamped to `0.0` through `1.0`.
-- NaN and infinity become zero before reaching the drone.
-
-This keeps controllers independent from aircraft definitions. A controller may be physically unsuitable for a layout, but mismatched motor commands remain safe.
-
-## Controller organization
-
-- Selectable flight modes that own user controls and motor mixing use `_controller` names.
-- Reusable control utilities are named by their function without `_controller`; `pid` owns only generic PID calculation, state, and limits.
-- Each flight controller owns its sensor selection and fusion, attitude estimates, PID instances and tuning, setpoints, and motor mixing.
-- Motor mixing stays controller-specific because motor indices and geometry belong to the aircraft layout.
-
-## Flow
-
-Startup:
-
-```text
-main
-  -> initialize Jolt runtime
-  -> select an aircraft or use the command-line choice
-  -> construct Simulation
-       -> create physics world and floor
-       -> create the selected drone definition
-       -> create generic Drone from definition
-       -> size motor command buffer from the drone
-       -> create sensors and controllers
-  -> initialize SDL, OpenGL, ImGui, and Renderer
-  -> play the skippable startup animation
-  -> run the interactive frame loop
-```
-
-One fixed simulation step:
-
-```text
-Jolt state
-  -> sample sensors
-  -> clear motor commands
-  -> run selected controller
-  -> copy commands for motors that physically exist
-  -> update motor speeds
-  -> apply thrust and reaction torque
-  -> advance Jolt physics
-  -> advance simulation time
-```
-
-Switching controllers resets the newly selected stateful controller but leaves the drone's physical state untouched. Its next output replaces the motor commands on the next fixed step.
-
-## Future work
-
-- Freeform visual geometry
-
-- Change coliisions to spheres
-
-- Physics migration to Nexus GPU. It works without NVIDIA, but it is Rust and still new. 
-
-- Tune quadcopter controller.
-- Add sensor noise.
-- Add map geometry.
-
-
-- Add altitude control with altimeter for TBC
-- Add position hold with GPS for TBC
-
-- 4x 4rotor drone for 0 G
-
-- add telemetry loggign to csv
-
-- add a streak to see drone movement better
+- Individual controller and custom aircraft migrations.
+- Sensor noise and independent sample rates.
+- Telemetry CSV and movement trails.
+- More detailed aircraft assets only if wanted.
+- Map geometry (visual only until terrain/ground support is deliberately extended).
+- Preserved custom-aircraft ideas: verify triangular-bipyramid torque directions, add its altitude and GPS position hold, and explore a 4-by-4-rotor zero-gravity aircraft. These are deferred, not automatically supported by the bundled models.

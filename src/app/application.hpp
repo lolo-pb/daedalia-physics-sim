@@ -2,6 +2,6 @@
 
 #include <optional>
 
-#include "drones/drone_definition.hpp"
+#include "aircraft/aircraft_definition.hpp"
 
-int RunInteractiveApplication(std::optional<DroneType> selected_drone);
+int RunInteractiveApplication(std::optional<AircraftType> selected_aircraft);

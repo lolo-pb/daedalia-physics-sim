@@ -1,10 +1,11 @@
 #pragma once
 
 #include "sensors/sensor_types.hpp"
+struct AircraftState;
+
+double BarometricAltitudeFt(double pressure_psf);
 
 class IdealBarometerModel {
 public:
-    BarometerSample Sample(double timestamp_seconds, float world_altitude_meters) const;
+    BarometerSample Sample(const AircraftState &state) const;
 };
-
-float BarometricAltitudeMeters(float pressure_pascals);

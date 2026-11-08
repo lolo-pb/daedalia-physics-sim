@@ -2,28 +2,40 @@
 
 #include "controllers/controller_io.hpp"
 #include "controllers/pid.hpp"
+#include "controllers/quaternion.hpp"
 
 class PositionHoldController {
 public:
-    PositionHoldController();
+	PositionHoldController();
 
-    void Reset();
-    void Update(const ControllerInput &input, MotorCommands &motor_commands);
+	void Reset();
+	void Update(const ControllerInput &input, ControllerOutput &output);
 
 private:
-    void CaptureTarget(const ControllerInput &input);
-    void UpdateAttitudeEstimate(const ControllerInput &input);
+	void UpdateAttitudeEstimate(const ControllerInput &input);
+	void ApplyCorrections(const ControllerInput &input, ControllerOutput &output);
+	void SetWorldEstimate(const ControllerInput &input);
 
-    Pid pitch_pid_;
-    Pid roll_pid_;
-    Pid yaw_pid_;
-    Pid altitude_pid_;
-    float target_world_x_meters_ = 0.0f;
-    float target_world_z_meters_ = 0.0f;
-    float target_altitude_meters_ = 0.0f;
-    float target_heading_rad_ = 0.0f;
-    float pitch_rad_ = 0.0f;
-    float roll_rad_ = 0.0f;
-    float yaw_rad_ = 0.0f;
-    bool target_initialized_ = false;
+	enum ControllerState {
+		WakeUp,
+		Initializing,
+		Armed,
+	};
+	ControllerState state = WakeUp;
+
+	Quaternion body_to_ned_;
+	Quaternion target_body_to_ned;
+
+	Pid altitude_pid_;
+	Pid pitch_pid_;
+	Pid roll_pid_;
+
+	float timestep;
+	double altitude_target = 10;
+
+	float altitude_correction;
+	float pitch_correction;
+	float roll_correction;
+
+	bool flipped = false;
 };

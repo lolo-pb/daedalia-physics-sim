@@ -1,6 +1,7 @@
 #include "renderer.hpp"
 
 #include <cstdio>
+#include <vector>
 
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/ext/matrix_transform.hpp>
@@ -10,6 +11,7 @@
 namespace {
 
 constexpr float FloorHalfExtent = 1000.0f;
+constexpr int FloorGridCells = 64;
 
 GLuint CompileShader(GLenum type, const char *source) {
     const GLuint shader = glCreateShader(type);
@@ -39,11 +41,20 @@ GLuint CreateProgram() {
         layout (location = 1) in vec3 normal;
         uniform mat4 model;
         uniform mat4 view_projection;
+        uniform bool curve_floor;
         out vec3 world_normal;
         out vec3 world_position;
         void main() {
-            world_normal = mat3(model) * normal;
             world_position = vec3(model * vec4(position, 1.0));
+            world_normal = mat3(model) * normal;
+            if (curve_floor) {
+                world_position.y = -(world_position.x * world_position.x / (2.0 * 20925646.32546)
+                    + world_position.z * world_position.z / (2.0 * 20855486.5951 * 20855486.5951 / 20925646.32546));
+                world_normal = normalize(vec3(
+                    world_position.x / 20925646.32546,
+                    1.0,
+                    world_position.z / (20855486.5951 * 20855486.5951 / 20925646.32546)));
+            }
             gl_Position = view_projection * vec4(world_position, 1.0);
         }
     )";
@@ -170,17 +181,32 @@ bool Renderer::Initialize() {
          0.5f,-0.5f,-0.5f, 1, 0, 0,  0.5f, 0.5f,-0.5f, 1, 0, 0,  0.5f, 0.5f, 0.5f, 1, 0, 0,  0.5f,-0.5f,-0.5f, 1, 0, 0,  0.5f, 0.5f, 0.5f, 1, 0, 0,  0.5f,-0.5f, 0.5f, 1, 0, 0,
         -0.5f,-0.5f,-0.5f,-1, 0, 0, -0.5f,-0.5f, 0.5f,-1, 0, 0, -0.5f, 0.5f, 0.5f,-1, 0, 0, -0.5f,-0.5f,-0.5f,-1, 0, 0, -0.5f, 0.5f, 0.5f,-1, 0, 0, -0.5f, 0.5f,-0.5f,-1, 0, 0,
     };
-    constexpr float plane_vertices[] = {
-        -FloorHalfExtent, 0.0f,-FloorHalfExtent, 0, 1, 0,  FloorHalfExtent, 0.0f,-FloorHalfExtent, 0, 1, 0,  FloorHalfExtent, 0.0f, FloorHalfExtent, 0, 1, 0,
-        -FloorHalfExtent, 0.0f,-FloorHalfExtent, 0, 1, 0,  FloorHalfExtent, 0.0f, FloorHalfExtent, 0, 1, 0, -FloorHalfExtent, 0.0f, FloorHalfExtent, 0, 1, 0,
+    std::vector<float> plane_vertices;
+    plane_vertices.reserve(FloorGridCells * FloorGridCells * 6 * 6);
+    const auto append_floor_vertex = [&](float x, float z) {
+        plane_vertices.insert(plane_vertices.end(), {x, 0.0f, z, 0.0f, 1.0f, 0.0f});
     };
+    for (int z = 0; z < FloorGridCells; ++z) {
+        const float near_z = -FloorHalfExtent + 2.0f * FloorHalfExtent * z / FloorGridCells;
+        const float far_z = -FloorHalfExtent + 2.0f * FloorHalfExtent * (z + 1) / FloorGridCells;
+        for (int x = 0; x < FloorGridCells; ++x) {
+            const float left_x = -FloorHalfExtent + 2.0f * FloorHalfExtent * x / FloorGridCells;
+            const float right_x = -FloorHalfExtent + 2.0f * FloorHalfExtent * (x + 1) / FloorGridCells;
+            append_floor_vertex(left_x, near_z);
+            append_floor_vertex(right_x, near_z);
+            append_floor_vertex(right_x, far_z);
+            append_floor_vertex(left_x, near_z);
+            append_floor_vertex(right_x, far_z);
+            append_floor_vertex(left_x, far_z);
+        }
+    }
 
     cube_ = CreateMesh(cube_vertices, 36);
     if (cube_.vao == 0) {
         std::fprintf(stderr, "Cube mesh creation failed\n");
         return false;
     }
-    plane_ = CreateMesh(plane_vertices, 6);
+    plane_ = CreateMesh(plane_vertices.data(), static_cast<GLuint>(plane_vertices.size() / 6));
     if (plane_.vao == 0) {
         std::fprintf(stderr, "Plane mesh creation failed\n");
         return false;
@@ -194,7 +220,8 @@ bool Renderer::Initialize() {
 }
 
 void Renderer::DrawScene(
-    const DroneRenderState &drone,
+    const AircraftDefinition &definition,
+    const AircraftRenderState &aircraft,
     const glm::vec3 &camera_position,
     const glm::vec3 &camera_forward,
     int width,
@@ -204,23 +231,40 @@ void Renderer::DrawScene(
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glUseProgram(program_);
 
-    const glm::mat4 projection = glm::perspective(glm::radians(50.0f), static_cast<float>(width) / static_cast<float>(height), 0.1f, 100.0f);
+    const glm::mat4 projection = glm::perspective(glm::radians(50.0f), static_cast<float>(width) / static_cast<float>(height), 0.05f, 10000.0f);
     const glm::mat4 view = glm::lookAt(camera_position, camera_position + camera_forward, glm::vec3(0.0f, 1.0f, 0.0f));
     glUniformMatrix4fv(glGetUniformLocation(program_, "view_projection"), 1, GL_FALSE, glm::value_ptr(projection * view));
     glUniform1i(glGetUniformLocation(program_, "show_grid"), GL_TRUE);
-    DrawMesh(plane_, program_, glm::mat4(1.0f), glm::vec3(0.28f, 0.33f, 0.28f));
+    glUniform1i(glGetUniformLocation(program_, "curve_floor"), GL_TRUE);
+    const glm::mat4 floor_transform = glm::translate(
+        glm::mat4(1.0f), glm::vec3(camera_position.x, 0.0f, camera_position.z));
+    DrawMesh(plane_, program_, floor_transform, glm::vec3(0.28f, 0.33f, 0.28f));
     glUniform1i(glGetUniformLocation(program_, "show_grid"), GL_FALSE);
+    glUniform1i(glGetUniformLocation(program_, "curve_floor"), GL_FALSE);
 
-    const glm::mat4 transform = glm::translate(glm::mat4(1.0f), glm::vec3(drone.position.GetX(), drone.position.GetY(), drone.position.GetZ()))
-        * glm::mat4_cast(glm::quat(drone.rotation.GetW(), drone.rotation.GetX(), drone.rotation.GetY(), drone.rotation.GetZ()));
-    const glm::vec3 body_size(
-        drone.body_half_extent.GetX() * 2.0f,
-        drone.body_half_extent.GetY() * 2.0f,
-        drone.body_half_extent.GetZ() * 2.0f);
-    DrawMesh(cube_, program_, transform * glm::scale(glm::mat4(1.0f), body_size), glm::vec3(0.85f, 0.35f, 0.15f));
-    for (const JPH::RVec3 &motor_position : drone.motor_positions) {
-        const glm::mat4 marker = glm::translate(glm::mat4(1.0f), glm::vec3(motor_position.GetX(), motor_position.GetY(), motor_position.GetZ()))
-            * glm::scale(glm::mat4(1.0f), glm::vec3(0.05f));
-        DrawMesh(cube_, program_, marker, glm::vec3(0.1f, 0.8f, 0.9f));
+    const glm::mat4 transform = glm::translate(glm::mat4(1), glm::vec3(aircraft.position_ft))
+        * glm::mat4_cast(glm::quat(aircraft.rotation));
+    for (const AircraftVisualPart &part : definition.visual_parts) {
+        float angle = 0.0f;
+        switch (part.motion) {
+        case VisualPartMotion::Rotor: angle = static_cast<float>(aircraft.rotor_angles_rad[part.propulsion_index]); break;
+        case VisualPartMotion::LeftAileron: angle = static_cast<float>(aircraft.left_aileron_rad); break;
+        case VisualPartMotion::RightAileron: angle = static_cast<float>(aircraft.right_aileron_rad); break;
+        case VisualPartMotion::Elevator: angle = static_cast<float>(aircraft.elevator_rad); break;
+        case VisualPartMotion::Rudder: angle = -static_cast<float>(aircraft.rudder_rad); break;
+        case VisualPartMotion::Flap: angle = static_cast<float>(aircraft.flap_rad); break;
+        case VisualPartMotion::Fixed: break;
+        }
+        const glm::vec3 hinge(part.hinge_ft[0], part.hinge_ft[1], part.hinge_ft[2]);
+        const glm::vec3 center(part.center_ft[0], part.center_ft[1], part.center_ft[2]);
+        const glm::vec3 axis(part.axis[0], part.axis[1], part.axis[2]);
+        const glm::vec3 size(part.size_ft[0], part.size_ft[1], part.size_ft[2]);
+        const glm::vec3 color(part.color[0], part.color[1], part.color[2]);
+        const glm::mat4 model = transform * glm::translate(glm::mat4(1), hinge)
+            * glm::rotate(glm::mat4(1), angle, axis)
+            * glm::translate(glm::mat4(1), center - hinge)
+            * glm::rotate(glm::mat4(1), part.base_yaw_rad, glm::vec3(0,1,0))
+            * glm::scale(glm::mat4(1), size);
+        DrawMesh(cube_, program_, model, color);
     }
 }
