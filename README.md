@@ -83,3 +83,35 @@ The smoke checks cover model loading, stepping, finite state, sensor publication
 One of the defining features of this sim is the capability of defining custom geometry for experimental rotor craft. 
 
 The coolest one so far has been the triangular bipyramid drone, a custom-aircraft concept based on a 6 face triangular bipyramid geometry, for wich it used all its faces to maintain altitude at any orientation. It is maintained on a separate branch. It is not part of the aircraft list in this branch yet.
+
+## Headless altitude recording
+
+```sh
+./build/daedalia --altitude-test f450 position-hold 30
+```
+
+Arguments are aircraft, controller, and positive duration in simulated seconds.
+F450 controllers: `demo`, `angle`, `horizon`, `position-hold`. C172: `direct`.
+Runs without a window or keyboard input, as fast as possible, using normal startup conditions.
+Controllers requiring manual arming or throttle may remain idle.
+
+Each run creates a CSV such as `outputs/f450_position-hold_1.csv` and prints its path.
+Numbering starts at 1 and continues above the highest existing CSV or PNG number for that aircraft/controller pair.
+Only filenames are inspected; older timestamp-named files are left untouched.
+The output directory is relative to the launch directory.
+Columns are `time_seconds,height_change_ft`: true altitude change from the starting position, positive upward.
+Samples include time zero and every 60 Hz tick through the last tick at or before the requested duration.
+Durations shorter than one tick produce only the initial sample.
+The flag cannot be combined with `--aircraft` or `--smoke-test`.
+
+Add `--plot` to save a PNG graph beside the CSV:
+
+```sh
+./build/daedalia --altitude-test f450 position-hold 30 --plot
+python3 outputs/plot_altitude.py outputs/your_recording.csv
+```
+
+The plotting helper lives in `outputs/plot_altitude.py`; generated CSVs and PNGs are ignored by Git.
+It requires Matplotlib in the Python interpreter selected by CMake (`Python3_EXECUTABLE`).
+C++ launches that interpreter after closing the CSV, waits for the script, and reports plotting failures while preserving the CSV.
+The script uses a headless backend; no display is required. Keep the source plotting script available at its configured path.

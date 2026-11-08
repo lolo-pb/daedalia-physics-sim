@@ -85,6 +85,7 @@ target_include_directories(controller PUBLIC
 )
 
 add_executable(daedalia
+    src/app/altitude_test.cpp
     src/app/application.cpp
     src/app/aircraft_selection_menu.cpp
     src/app/renderer.cpp
@@ -109,6 +110,11 @@ target_include_directories(daedalia PRIVATE ${jsbsim_SOURCE_DIR}/src ${jsbsim_BI
 file(COPY ${jsbsim_SOURCE_DIR}/aircraft ${jsbsim_SOURCE_DIR}/engine ${jsbsim_SOURCE_DIR}/systems
     DESTINATION ${CMAKE_BINARY_DIR}/jsbsim-data)
 target_compile_definitions(daedalia PRIVATE DAEDALIA_JSBSIM_DATA_DIR="${CMAKE_BINARY_DIR}/jsbsim-data")
+
+target_compile_definitions(daedalia PRIVATE
+    DAEDALIA_PYTHON_EXECUTABLE="${Python3_EXECUTABLE}"
+    DAEDALIA_PLOT_SCRIPT="${CMAKE_SOURCE_DIR}/outputs/plot_altitude.py"
+)
 
 if(BUILD_TESTING)
     add_test(

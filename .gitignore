@@ -1,2 +1,4 @@
 /build/
 /imgui.ini
+/outputs/*
+!/outputs/plot_altitude.py
