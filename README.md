@@ -1,54 +1,74 @@
 # Daedalia Physics Sim
 
-A native C++ test bed for programmable sensors and flight controllers, powered by JSBSim 1.3.2. SDL creates the window, OpenGL draws representative aircraft, and ImGui displays simulation and sensor readings.
+Daedalia is a native C++20 flight-simulation sandbox for programmable sensors and flight controllers. JSBSim provides the aircraft dynamics and ground reactions; SDL3, OpenGL, and ImGui provide the interactive interface.
+
+The current aircraft are an F450 quadcopter and a Cessna 172, both backed by bundled JSBSim models and rendered as simple representative geometry driven by live simulation state.
 
 ## Build and run
 
-Requires a C++20 compiler, CMake 3.24+, Python 3 and OpenGL development libraries. CMake downloads JSBSim, SDL, GLM, glad and ImGui on first configuration.
+Requires CMake 3.24+, a C++20 compiler, Python 3, and OpenGL development libraries. CMake downloads JSBSim, SDL3, GLM, glad, and ImGui during the first configuration.
 
 ```sh
 cmake -S . -B build
 cmake --build build -j4
 ./build/daedalia
+```
+
+Choose an aircraft in the startup menu, or launch one directly:
+
+```sh
 ./build/daedalia --aircraft f450
 ./build/daedalia --aircraft c172
 ```
 
-Without an aircraft flag, choose the F450 quadcopter or Cessna 172 in the startup menu. The physics models are bundled JSBSim aircraft, not replicas of the old custom drones. The F450 is the default for headless checks.
+JSBSim aircraft, engine, and system data are copied to `build/jsbsim-data` during configuration. Keep that directory with the executable.
 
-Aircraft XML, engines and systems are copied into `build/jsbsim-data`. The executable uses an absolute configured data path, so launching from another working directory works. Keep that data directory with the build.
+To give an editor the exact CMake include paths:
 
-## Controls
+```sh
+cmake -S . -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+```
 
-Each aircraft declares its own controller. The F450 offers demo, angle, horizon, and position-hold controllers; each writes four raw motor commands with its own mixer. The C172 direct controller writes throttle and named actuator commands for aileron, elevator, rudder, flaps, and brakes. JSBSim provides aircraft dynamics only; its bundled stabilizers and autopilots are held off.
+This writes `build/compile_commands.json`.
 
-- W/S pitch, A/D roll, Q/E yaw.
-- R/F increase/decrease throttle (starts at zero).
-- G/H extend/retract flaps; hold B for brakes.
-- Hold the right mouse button to operate the camera. W/A/S/D move it, Space/Ctrl move vertically, and Shift moves faster.
-- Pause, single-step, reset, camera follow and physics frequency are available in the Physics panel.
+## Runtime
 
-The default simulation/controller/sensor tick is 60 Hz and is configurable from 1 to 240 Hz. JSBSim uses smaller internal integration steps where needed (at most 0.002 seconds for F450 and 1/120 second for C172, following the bundled example scripts). Commands are held through these substeps; sensors publish at the configured tick. Reset restores the on-ground starting pose, ready propulsion, zero commands, sensor readings and controller state.
+The startup menu selects an aircraft. The Physics panel selects one of that aircraft's available controllers:
 
-## Units and graphics
+- F450: demo, angle, horizon, and position hold
+- C172: direct
 
-Controller-facing samples use explicitly named native values: feet, feet/second, feet/second squared, pounds-force/square-foot and radians/second. Body axes are forward/right/down; GPS uses local north/east/down. Controllers own conversions needed by their algorithms. The ideal magnetic field is 50 microteslas pointing north.
+The application supports keyboard controller input, a right-mouse camera, pause, single step, reset, aircraft follow, and configurable simulation frequency. The simulation/controller/sensor tick defaults to 60 Hz and can be set from 1 to 240 Hz. JSBSim uses smaller internal integration steps where required by the aircraft definition.
 
-The OpenGL display also uses feet. It maps NED/body axes to X right, Y up, -Z forward for the camera and geometry. The graphics are simple representative parts, with aircraft pose, rotor speeds and hinged surfaces driven by JSBSim state. Ground reactions come entirely from JSBSim; there is no general mesh collision system.
+## Architecture
 
-The stock F450 XML currently emits a configuration-version warning and duplicate internal sensor-property binding warnings. Backend stepping and lift-off were checked, but this is not a claim that the supplied model is fully validated. Daedalia's programmable sensors read JSBSim ground truth independently of those internal model sensors.
+`src/aircraft/` defines each aircraft, including its JSBSim model, startup conditions, actuator bindings, visual parts, and selectable controllers.
 
-## Extension points
+`src/physics/` owns JSBSim and native simulation state. 
 
-`src/aircraft/` contains a single `AircraftDefinition` per aircraft. It references the JSBSim model, starting conditions, geometry, command properties and available controllers. Geometry and controller lists can live in referenced files without splitting the aircraft declaration into independent catalogs.
+`src/sensors/` publishes programmable sensor samples. 
 
-`src/physics/` owns JSBSim and native ground truth. `src/sensors/` turns that state into programmable samples. `src/controllers/` defines the unified `ControllerInput` / `ControllerOutput` contract and the manual controller. `src/app/` owns the window, fixed-step loop, UI and rendering.
+`src/controllers/` owns the shared `ControllerInput` / `ControllerOutput` contract. 
 
-Controllers receive sensor samples, not the ground-truth object. Ground truth remains available to the backend, sensors, renderer and debug UI.
+`src/app/` owns the fixed-step loop, UI, camera, and OpenGL renderer.
 
-Existing controller implementations remain in the repository but are excluded from the build and selection. Their sensor names, units, motor mapping and tuning await individual review. F450's indexed motor commands are bound directly to its external ESC inputs; other aircraft can expose their own actuator bindings through AircraftDefinition.
+Controllers receive sensor samples rather than `AircraftState`. Simulation state remains available to the backend, sensors, renderer, and debug UI.
 
-## Focused backend checks
+## Units and frames
+
+Controller-facing values retain JSBSim-native units:
+
+- Position: feet
+- Velocity: feet per second
+- Specific force: feet per second squared
+- Pressure: pounds per square foot
+- Angular rate: radians per second
+
+Body axes are forward, right, down. World position and velocity use local north, east, down (NED). The renderer converts those frames into its right, up, back display frame.
+
+The supplied IMU, GPS, barometer, and magnetometer models are ideal at present: they have no modeled noise, latency, bias, quantization, dropout, or GPS error.
+
+## Checks
 
 ```sh
 ./build/daedalia --smoke-test --aircraft f450
@@ -56,6 +76,10 @@ Existing controller implementations remain in the repository but are excluded fr
 ctest --test-dir build --output-on-failure
 ```
 
-These check model loading, stepping, finite state, sensor publication, manual commands and reset/frequency changes. They do not assert legacy controller stability.
+The smoke checks cover model loading, stepping, finite state, sensor publication, basic controller commands, reset, and frequency changes. They do not validate controller tuning or flight stability.
 
-Migration stages 1–5 are the current scope. Existing-controller adaptations and custom aircraft ports require the next individual review.
+## Experimental geometry drones
+
+One of the defining features of this sim is the capability of defining custom geometry for experimental rotor craft. 
+
+The coolest one so far has been the triangular bipyramid drone, a custom-aircraft concept based on a 6 face triangular bipyramid geometry, for wich it used all its faces to maintain altitude at any orientation. It is maintained on a separate branch. It is not part of the aircraft list in this branch yet.
