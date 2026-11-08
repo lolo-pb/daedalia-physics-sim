@@ -1,3 +1,5 @@
+This branch is ONLY for testing, this should never ever merge to main or anything else, only for extracrting data from other runnung branches
+
 # Daedalia Physics Sim
 
 Daedalia is a native C++20 flight-simulation sandbox for programmable sensors and flight controllers. JSBSim provides the aircraft dynamics and ground reactions; SDL3, OpenGL, and ImGui provide the interactive interface.
