@@ -22,11 +22,25 @@ constexpr double tilt_gain = 0.05f;
 const vec3d world_up{0, 0, -1}; // in ned
 const vec3d body_up{0, 0, -1}; // in body
 
+/*
+					Kp			Ki			Kd
+Stable baseline	0.0182330	0.0005266	0.0235160
+	0.0182330f,
+	0.0005266f,
+	0.0235160f,
+
+Fast settling	0.0606159	0.0017887	0.0341801
+	0.0606159f,
+	0.0017887f,
+	0.0341801f,
+*/
+
 constexpr PidConfig AltitudePidConfig{
-		// TODO needs further tuning
-		0.0002f, //0.0001f
-		0.000002f,
-		0.00f,
+		0.0606159f,
+		0.0017887f,
+		0.0341801f,
+		-100.0f,
+		100.0f,
 };
 
 constexpr PidConfig TiltPidConfig{
