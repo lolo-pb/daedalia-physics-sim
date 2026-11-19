@@ -4,6 +4,12 @@ Daedalia is a native C++20 flight-simulation sandbox for programmable sensors an
 
 The current aircraft are an F450 quadcopter and a Cessna 172, both backed by bundled JSBSim models and rendered as simple representative geometry driven by live simulation state.
 
+
+
+https://github.com/user-attachments/assets/694d7933-6e96-4514-844f-160b7822a8fc
+
+
+
 ## Build and run
 
 Requires CMake 3.24+, a C++20 compiler, Python 3, and OpenGL development libraries. CMake downloads JSBSim, SDL3, GLM, glad, and ImGui during the first configuration.
