@@ -17,9 +17,11 @@ const vec3d world_up{0, 0, -1};
 const vec3d body_up{0, 0, -1};
 
 constexpr PidConfig AltitudePidConfig{
-		0.0002f,
-		0.000002f,
-		0.00f,
+		0.0606159f,
+		0.0017887f,
+		0.0341801f,
+		-100.0f,
+		100.0f,
 };
 
 constexpr PidConfig TiltPidConfig{
@@ -106,7 +108,7 @@ void AngleModeController::ApplyCorrections(const ControllerInput &input, Control
 	if (vertical_alignment >= 0.0) {
 		flipped = false;
 		altitude_correction = base_throttle + altitude_pid_.Update(
-				altitude_target - altitude, vertical_speed, timestep);
+																							altitude_target - altitude, vertical_speed, timestep);
 	} else {
 		flipped = true;
 		altitude_correction = 0;
