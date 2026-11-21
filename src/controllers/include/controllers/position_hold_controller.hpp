@@ -32,6 +32,10 @@ private:
 
 	float timestep;
 	double altitude_target = 10;
+	float north_target_ft_ = 0.0f;
+	float east_target_ft_ = 0.0f;
+	float north_integral_ = 0.0f;
+	float east_integral_ = 0.0f;
 
 	float altitude_correction;
 	float pitch_correction;
