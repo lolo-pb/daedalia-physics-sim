@@ -11,12 +11,14 @@
 #include <models/FGAccelerations.h>
 #include <models/FGAtmosphere.h>
 #include <models/FGFCS.h>
+#include <models/FGMassBalance.h>
 #include <models/FGPropagate.h>
 #include <models/FGPropulsion.h>
 #include <input_output/FGPropertyManager.h>
 #include <glm/gtc/quaternion.hpp>
 
 namespace {
+constexpr double KgPerPound = 0.45359237;
 glm::dvec3 Vector(const JSBSim::FGColumnVector3 &v) { return {v(1), v(2), v(3)}; }
 }
 
@@ -45,6 +47,7 @@ struct JsbsimBackend::Impl {
         if (!exec.LoadModel(std::string(definition.jsbsim_model))) {
             throw std::runtime_error("Cannot load JSBSim aircraft: " + std::string(definition.jsbsim_model));
         }
+        if (definition.empty_mass_kg) exec.GetMassBalance()->SetEmptyWeight(*definition.empty_mass_kg / KgPerPound);
         exec.DisableOutput();
         const auto ic = exec.GetIC();
         ic->SetLatitudeDegIC(definition.latitude_deg);
@@ -53,6 +56,11 @@ struct JsbsimBackend::Impl {
         ic->SetAltitudeAGLFtIC(definition.initial_altitude_agl_ft);
         ic->SetPsiDegIC(0);
         if (!exec.RunIC()) throw std::runtime_error("JSBSim initial conditions failed");
+        if (definition.empty_mass_kg) {
+            const double actual = exec.GetMassBalance()->GetWeight() * KgPerPound;
+            if (!std::isfinite(actual) || std::abs(actual - *definition.empty_mass_kg) > 0.001)
+                throw std::runtime_error("JSBSim mass mismatch: " + std::to_string(actual) + " kg");
+        }
         origin = exec.GetPropagate()->GetLocation();
         origin.SetPositionGeodetic(origin.GetLongitude(), origin.GetGeodLatitudeRad(), 0);
         for (const auto property : definition.control_properties) {
@@ -82,6 +90,7 @@ struct JsbsimBackend::Impl {
 JsbsimBackend::JsbsimBackend(const AircraftDefinition &definition) : definition_(definition) { Reset(1.0 / 60); }
 JsbsimBackend::~JsbsimBackend() = default;
 void JsbsimBackend::Reset(double timestep) { impl_ = std::make_unique<Impl>(definition_, timestep); }
+double JsbsimBackend::GetMassKg() const { return impl_->exec.GetMassBalance()->GetWeight() * KgPerPound; }
 void JsbsimBackend::SetTimestep(double seconds) {
     impl_->integration_steps = std::max(1, static_cast<int>(std::ceil(seconds / definition_.max_integration_step_seconds)));
     impl_->exec.Setdt(seconds / impl_->integration_steps);

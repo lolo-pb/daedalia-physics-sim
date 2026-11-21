@@ -37,6 +37,7 @@ struct AircraftDefinition {
     std::span<const std::string_view> simulator_control_disable_properties;
     std::span<const AircraftVisualPart> visual_parts;
     std::span<const ControllerType> available_controllers;
+    std::optional<double> empty_mass_kg{};
 };
 
 inline constexpr AircraftType DefaultAircraftType = AircraftType::F450;

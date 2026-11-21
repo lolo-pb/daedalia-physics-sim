@@ -4,11 +4,21 @@
 #include "controllers/pid.hpp"
 #include "controllers/quaternion.hpp"
 
+#include "controllers/position_target.hpp"
+#include <optional>
+
+struct AltitudeCommands {
+	float base = 0, pid = 0, collective = 0;
+};
+
 class PositionHoldController {
 public:
 	PositionHoldController();
 
 	void Reset();
+	// Absolute sensor coordinates: GPS north/east and barometric altitude.
+	void SetTarget(PositionTarget target) { exact_target_ = target; }
+	AltitudeCommands GetAltitudeCommands() const { return altitude_commands_; }
 	void Update(const ControllerInput &input, ControllerOutput &output);
 
 private:
@@ -37,7 +47,8 @@ private:
 	float north_integral_ = 0.0f;
 	float east_integral_ = 0.0f;
 
-	float altitude_correction;
+	std::optional<PositionTarget> exact_target_;
+	AltitudeCommands altitude_commands_;
 	float pitch_correction;
 	float roll_correction;
 

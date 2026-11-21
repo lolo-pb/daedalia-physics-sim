@@ -86,6 +86,7 @@ target_include_directories(controller PUBLIC
 
 add_executable(daedalia
     src/app/altitude_test.cpp
+    src/app/trajectory_test.cpp
     src/app/application.cpp
     src/app/aircraft_selection_menu.cpp
     src/app/renderer.cpp

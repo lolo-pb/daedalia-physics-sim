@@ -117,3 +117,21 @@ The plotting helper lives in `outputs/plot_altitude.py`; generated CSVs and PNGs
 It requires Matplotlib in the Python interpreter selected by CMake (`Python3_EXECUTABLE`).
 C++ launches that interpreter after closing the CSV, waits for the script, and reports plotting failures while preserving the CSV.
 The script uses a headless backend; no display is required. Keep the source plotting script available at its configured path.
+
+## F450 trajectory baseline
+
+```sh
+./build/daedalia --trajectory-test f450 position-hold
+./build/daedalia --trajectory-test f450 position-hold --mass-kg 1.6
+```
+
+Each command flies 60 simulated seconds at 60 Hz. The optional mass is the
+total empty mass in kilograms (default 1.4). The model retains its stock
+center of gravity and rotational inertia.
+
+The targets in feet (north, east, height above launch) are (0, 0, 10) at
+startup, (0, 0, 15) at 15 seconds, (10, 0, 15) at 30 seconds and (0, 5, 10)
+at 45 seconds. Height uses the barometer and vertical speed is positive up.
+Each numbered CSV in `outputs/` pairs the sensor readings at the start of a
+tick with the commands applied during that tick. The console reports altitude
+RMSE per segment and mean collective and vertical speed from 10 to 15 seconds.

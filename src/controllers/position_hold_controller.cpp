@@ -96,6 +96,8 @@ PositionHoldController::PositionHoldController()
 
 void PositionHoldController::Reset() {
 	state = WakeUp;
+	exact_target_.reset();
+	altitude_commands_ = {};
 	altitude_target = 10;
 	altitude_pid_.Reset();
 	pitch_pid_.Reset();
@@ -118,7 +120,7 @@ void PositionHoldController::Update(const ControllerInput &input, ControllerOutp
 	UpdateAttitudeEstimate(input);
 	ApplyCorrections(input, output);
 
-	MixMotorTargets(output, altitude_correction, pitch_correction, roll_correction, 0);
+	MixMotorTargets(output, altitude_commands_.collective, pitch_correction, roll_correction, 0);
 }
 
 void PositionHoldController::UpdateAttitudeEstimate(const ControllerInput &input) {
@@ -139,7 +141,15 @@ void PositionHoldController::ApplyCorrections(const ControllerInput &input, Cont
 	const vec3d &velocity = input.gps.velocity_ned_ft_per_second;
 	const double altitude = BarometricAltitudeFt(input.barometer.pressure_psf);
 
-	altitude_target += AltitudeTargetRateFtPerSecond * KeyAxis(input.keys.r, input.keys.f) * timestep;
+	if (exact_target_) {
+		north_target_ft_ = exact_target_->north_ft;
+		east_target_ft_ = exact_target_->east_ft;
+		altitude_target = exact_target_->height_ft;
+	} else {
+		north_target_ft_ += PositionTargetRateFtPerSecond * KeyAxis(input.keys.w, input.keys.s) * timestep;
+		east_target_ft_ += PositionTargetRateFtPerSecond * KeyAxis(input.keys.d, input.keys.a) * timestep;
+		altitude_target += AltitudeTargetRateFtPerSecond * KeyAxis(input.keys.r, input.keys.f) * timestep;
+	}
 	const SensorVector3 body_up_in_world = RotateVector(body_to_ned_, body_up);
 
 	// If the drone is inverted
@@ -148,14 +158,12 @@ void PositionHoldController::ApplyCorrections(const ControllerInput &input, Cont
 
 	if (vertical_alignment >= 0.0) {
 		flipped = false;
-		altitude_correction = base_throttle + altitude_pid_.Update(altitude_target - altitude, vertical_speed, timestep);
+		const float pid = altitude_pid_.Update(altitude_target - altitude, vertical_speed, timestep);
+		altitude_commands_ = {base_throttle, pid, base_throttle + pid};
 	} else {
 		flipped = true;
-		altitude_correction = 0;
+		altitude_commands_ = {};
 	}
-
-	north_target_ft_ += PositionTargetRateFtPerSecond * KeyAxis(input.keys.w, input.keys.s) * timestep;
-	east_target_ft_ += PositionTargetRateFtPerSecond * KeyAxis(input.keys.d, input.keys.a) * timestep;
 
 	const double north_tilt = UpdatePositionAxis(north_target_ft_ - position.x, velocity.x, timestep, north_integral_);
 	const double east_tilt = UpdatePositionAxis(east_target_ft_ - position.y, velocity.y, timestep, east_integral_);

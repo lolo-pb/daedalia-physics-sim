@@ -3,6 +3,7 @@
 #include "app/simulation.hpp"
 
 #include "app/altitude_test.hpp"
+#include "app/trajectory_test.hpp"
 
 #include <charconv>
 #include <cmath>
@@ -13,7 +14,31 @@
 #include <string_view>
 
 int main(int argc, char **argv) {
-	std::optional<AircraftType> aircraft;
+	if (argc > 1 && std::string_view(argv[1]) == "--trajectory-test") {
+        if ((argc != 4 && argc != 6) || std::string_view(argv[2]) != "f450" ||
+            std::string_view(argv[3]) != "position-hold" || (argc == 6 && std::string_view(argv[4]) != "--mass-kg")) {
+            std::fprintf(stderr, "Usage: %s --trajectory-test f450 position-hold [--mass-kg kg]\n", argv[0]);
+            return EXIT_FAILURE;
+        }
+        double mass = 1.4;
+        if (argc == 6) {
+            const std::string_view value(argv[5]);
+            const auto end = value.data() + value.size();
+            const auto result = std::from_chars(value.data(), end, mass);
+            if (result.ec != std::errc{} || result.ptr != end || !std::isfinite(mass) || mass <= 0) {
+                std::fprintf(stderr, "Mass must be a positive finite number in kg\n");
+                return EXIT_FAILURE;
+            }
+        }
+        try {
+            RunTrajectoryTest(mass);
+            return EXIT_SUCCESS;
+        } catch (const std::exception &error) {
+            std::fprintf(stderr, "Daedalia: %s\n", error.what());
+            return EXIT_FAILURE;
+        }
+    }
+    std::optional<AircraftType> aircraft;
 	bool smoke = false;
 	bool plot = false;
 	std::optional<AircraftType> test_aircraft;
@@ -22,6 +47,7 @@ int main(int argc, char **argv) {
 	for (int i = 1; i < argc; ++i) {
 		const std::string_view argument(argv[i]);
 		if (argument == "--help") {
+            std::printf("Trajectory: %s --trajectory-test f450 position-hold [--mass-kg kg]\n", argv[0]);
 			std::printf("Usage: %s [--aircraft f450|c172] [--smoke-test]\n", argv[0]);
 			std::printf("       %s --altitude-test <aircraft> <controller> <seconds> [--plot]\n"
 									"Controllers: f450: demo, angle, horizon, position-hold; c172: direct\n",

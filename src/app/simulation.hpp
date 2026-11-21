@@ -2,6 +2,7 @@
 
 #include <array>
 #include <memory>
+#include "controllers/position_hold_controller.hpp"
 #include "aircraft/aircraft_definition.hpp"
 #include "controllers/controller_io.hpp"
 #include "physics/aircraft_state.hpp"
@@ -21,6 +22,9 @@ public:
     ~Simulation();
     Simulation(const Simulation &) = delete;
     Simulation &operator=(const Simulation &) = delete;
+    double GetMassKg() const;
+    void SetPositionTarget(PositionTarget absolute_target);
+    AltitudeCommands GetAltitudeCommands() const;
     void SelectController(int slot);
     void Step(const ControllerKeys &keys);
     void Reset();

@@ -66,6 +66,10 @@ struct Simulation::Impl {
 Simulation::Simulation(const AircraftDefinition &definition) : impl_(std::make_unique<Impl>(definition)) {}
 Simulation::~Simulation() = default;
 
+double Simulation::GetMassKg() const { return impl_->backend.GetMassKg(); }
+void Simulation::SetPositionTarget(PositionTarget target) { impl_->f450_position_hold.SetTarget(target); }
+AltitudeCommands Simulation::GetAltitudeCommands() const { return impl_->f450_position_hold.GetAltitudeCommands(); }
+
 void Simulation::SelectController(int slot) {
     const auto controllers = impl_->definition.available_controllers;
     if (slot < 1 || static_cast<std::size_t>(slot) > controllers.size()) return;

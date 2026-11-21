@@ -12,6 +12,7 @@ public:
     void Reset(double timestep_seconds);
     void Step(const ControllerOutput &commands);
     void SetTimestep(double seconds);
+    double GetMassKg() const;
     AircraftState ReadState() const;
 private:
     struct Impl;
